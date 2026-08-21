@@ -10,7 +10,11 @@
 export interface CronJobHandle {
     /** Stop firing and release timers. Idempotent. */
     stop(): void;
-    /** Next time this job will fire, or null when it never will again. */
+    /**
+     * Next time this job can fire, or null when it cannot — because the job is
+     * stopped, or because no matching time was found within the adapter's
+     * documented scan horizon (adapters may bound the search).
+     */
     nextRun(): Date | null;
 }
 /**

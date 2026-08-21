@@ -104,6 +104,16 @@ First ports/adapters-layer entries:
   dependency. Documented divergences from croner: sub-minute firing time
   (within the minute, not second 0), 5-field numeric only (stricter
   validation), dom/dow ANDed (no vixie OR).
+- **v0.4.1 contract rework** (dual-review catch): scheduling state collapsed
+  to a single epoch-minute cursor — creation minute suppressed (restart
+  cannot double-fire; croner second-0 parity), exactly-once per epoch minute,
+  best-effort no-catch-up on poll stalls, `nextRun()` derived from the same
+  cursor (reports a pending current-minute fire; never advertises a
+  suppressed one). DST policy defined and tested with an injectable
+  timezone-offset source: fall-back repeated labels fire once per epoch
+  minute (twice per label), spring-forward nonexistent labels skip. Options
+  validated at factory creation; port's nextRun() null semantics now include
+  the scan horizon.
 - 3c note: `matchesCronExpression`-based fire policy in soma-work's
   CronScheduler tick loop is now a candidate to adopt this adapter/portfolio
   later; its storage-driven multi-job loop stays app-side until a JobStore
