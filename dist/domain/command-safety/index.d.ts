@@ -99,6 +99,15 @@ export interface RuleSet {
  */
 export declare function createRuleSet(rules: ReadonlyArray<DangerousRule>): RuleSet;
 /**
+ * Execution-dispatch detection rules (curl|sh family), extracted verbatim
+ * from soma's `BLOCKED_EXECUTION_RULES` (soma Security Audit S5). Exported as
+ * a named subset so soma can keep consuming them as hard-deny lockdown rules
+ * while the canonical catalog exposes them as overridable ask rules.
+ * Matcher regexes use only the `i` flag — never `/g` or `/y` (matchRules
+ * evaluates the whole catalog; a stateful lastIndex would leak between calls).
+ */
+export declare const EXECUTION_DISPATCH_RULES: ReadonlyArray<DangerousRule>;
+/**
  * Canonical shared catalog. Declared once, consumed by:
  *   - the flat engine exports below (`matchRules`, `overridableMatchedRuleIds`, …)
  *   - soma-work `bypassBashPermissionDecision` (overridable subset)

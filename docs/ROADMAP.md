@@ -50,12 +50,27 @@ to physically merge the repos.
 - Packaging decision: release-tarball dependency over HTTPS (not `git:`) — see
   README §Consuming for the gitconfig-insteadOf rationale.
 
+### Step 2 — catalog merge: execution-dispatch promotion ✅ (2026-08-21, v0.2.0)
+
+Per-rule decisions:
+
+- **Promoted**: soma's 7 execution-dispatch rules (`pipe-to-interpreter`,
+  `pipe-to-path-interpreter`, `pipe-to-busybox`, `process-substitution`,
+  `source-dot-substitution`, `xargs-to-interpreter`,
+  `env-wrapped-interpreter`) moved verbatim into the canonical catalog as
+  `sessionOverridable: true` — soma-work's bypass escalation now ASKS on
+  curl|sh-style dispatch instead of sailing through; legitimate installer
+  pipes can be approved or session-disabled.
+- **Not adopted**: canonical kill/reboot/rm family stays out of soma's
+  hard-deny set — those semantics are only safe as ask-rules (soma has no ask
+  flow; hard-denying `kill` would break personal-bot workflows).
+- **Deduped**: soma deletes its local `BLOCKED_EXECUTION_RULES` regex
+  definitions and consumes `EXECUTION_DISPATCH_RULES` (hard-deny policy and
+  deny-reason strings preserved). `BLOCKED_PATTERNS` substring denies stay
+  app-side (personal policy).
+
 ## Candidate backlog (suggested order — re-evaluate each step)
 
-2. **command-safety catalog merge** — decide per-rule whether soma adopts
-   canonical rules and/or soma's execution-dispatch rules (pipe-to-interpreter
-   family) enter the canonical catalog. First deliberate *behavior* change;
-   needs per-rule review, not a code move.
 3. **cron/scheduling domain** — soma `src/scheduler/*` + `cron.yaml` vs
    soma-work `src/cron-scheduler.ts` + `somalib/cron/cron-storage.ts`. Domain:
    job spec, schedule computation, run-request lifecycle. Ports: `JobStore`,

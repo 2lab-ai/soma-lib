@@ -128,6 +128,87 @@ export function createRuleSet(rules: ReadonlyArray<DangerousRule>): RuleSet {
   };
 }
 
+// Interpreter lists are defined once (DRY) to prevent drift between the
+// execution-dispatch matchers. Word boundary (\b) after interpreter names
+// prevents false positives like `| sha256sum` or `| show`.
+const SHELL_INTERPRETERS = 'sh|bash|zsh|dash|ksh|csh|tcsh|fish';
+const SCRIPT_INTERPRETERS = 'python[23]?|perl|ruby|node|php';
+const ALL_INTERPRETERS = `${SHELL_INTERPRETERS}|${SCRIPT_INTERPRETERS}`;
+
+const EXECUTION_DISPATCH_PATTERNS: ReadonlyArray<{
+  id: string;
+  label: string;
+  description: string;
+  regex: RegExp;
+}> = [
+  {
+    id: 'pipe-to-interpreter',
+    label: 'pipe to interpreter',
+    description: 'Pipe to shell/script interpreter',
+    regex: new RegExp(`\\|\\s*(?:${ALL_INTERPRETERS})\\b`, 'i'),
+  },
+  {
+    id: 'pipe-to-path-interpreter',
+    label: 'pipe to path/env interpreter',
+    description: 'Pipe to absolute-path or env-wrapped interpreter',
+    regex: new RegExp(
+      `\\|\\s*(?:\\/(?:usr\\/)?(?:local\\/)?(?:s?bin)\\/(?:env\\s+(?:-\\S+\\s+)*)?|env\\s+(?:-\\S+\\s+)*)(?:${ALL_INTERPRETERS})\\b`,
+      'i',
+    ),
+  },
+  {
+    id: 'pipe-to-busybox',
+    label: 'pipe to busybox shell',
+    description: 'Pipe to busybox-wrapped shell',
+    regex: new RegExp(`\\|\\s*(?:\\/(?:usr\\/)?(?:local\\/)?(?:s?bin)\\/)?busybox\\s+(?:sh|bash|ash|dash)\\b`, 'i'),
+  },
+  {
+    id: 'process-substitution',
+    label: 'process substitution fetch',
+    description: 'Process substitution with remote fetch',
+    regex: new RegExp(`(?:${SHELL_INTERPRETERS})\\s+<\\(\\s*(?:curl|wget)\\b`, 'i'),
+  },
+  {
+    id: 'source-dot-substitution',
+    label: 'source remote substitution',
+    description: 'Source/dot process substitution with remote fetch',
+    // dot-source: `. <(curl ...)` / `source <(curl ...)` — `\.\s` (not just `\.`)
+    // because shell requires whitespace after `.` builtin to distinguish from filenames
+    regex: /(?:source|\.\s)\s*<\(\s*(?:curl|wget)\b/i,
+  },
+  {
+    id: 'xargs-to-interpreter',
+    label: 'xargs to interpreter',
+    description: 'Xargs to shell/script interpreter',
+    regex: new RegExp(`\\|\\s*xargs\\s+(?:${ALL_INTERPRETERS})\\b`, 'i'),
+  },
+  {
+    id: 'env-wrapped-interpreter',
+    label: 'env-wrapped pipe to interpreter',
+    description: 'Env-wrapped pipe to interpreter',
+    regex: new RegExp(
+      `\\|\\s*(?:\\/(?:usr\\/)?(?:local\\/)?(?:s?bin)\\/)?env\\s+(?:-\\S+\\s+)*(?:${ALL_INTERPRETERS})\\b`,
+      'i',
+    ),
+  },
+];
+
+/**
+ * Execution-dispatch detection rules (curl|sh family), extracted verbatim
+ * from soma's `BLOCKED_EXECUTION_RULES` (soma Security Audit S5). Exported as
+ * a named subset so soma can keep consuming them as hard-deny lockdown rules
+ * while the canonical catalog exposes them as overridable ask rules.
+ * Matcher regexes use only the `i` flag — never `/g` or `/y` (matchRules
+ * evaluates the whole catalog; a stateful lastIndex would leak between calls).
+ */
+export const EXECUTION_DISPATCH_RULES: ReadonlyArray<DangerousRule> = EXECUTION_DISPATCH_PATTERNS.map((p) => ({
+  id: p.id,
+  label: p.label,
+  description: p.description,
+  sessionOverridable: true,
+  match: (cmd: string) => p.regex.test(cmd),
+}));
+
 /**
  * Canonical shared catalog. Declared once, consumed by:
  *   - the flat engine exports below (`matchRules`, `overridableMatchedRuleIds`, …)
@@ -228,6 +309,13 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     sessionOverridable: true,
     match: (cmd) => /\bchmod\s+(-[a-zA-Z]*R|--recursive)\s+[0-7]*7[0-7]*7/.test(cmd),
   },
+
+  // Execution-dispatch family — promoted from soma (Step 2, 2026-08-21).
+  // Detects piping/substituting remote or piped content into an interpreter,
+  // which bypasses substring-based blocklists (soma Security Audit S5).
+  // Overridable here: soma-work's ask flow can approve legitimate installer
+  // pipes; soma consumes the same EXECUTION_DISPATCH_RULES as hard-deny.
+  ...EXECUTION_DISPATCH_RULES,
 
   // Lockdown rules — present in the catalog for labelling/parity only.
   // See file-header notes: these do NOT flow through ask/override escalation.
