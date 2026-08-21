@@ -90,3 +90,26 @@ it for the reader who is about to duplicate you.
   (storage-driven multi-job loop — candidate to adopt this adapter later,
   noted in ROADMAP backlog). Keywords: croner replacement, polling scheduler,
   minute dedup, wall clock, timezone, nextRun.
+
+### src/domain/session-state
+
+- **Purpose**: pure state machine for an agent chat session's runtime — the
+  `ActivityState`/`QueryState` algebra with stop/interrupt flags and a
+  generation counter for stale-callback fencing.
+- **Covers**: `SessionRuntimeState` + every transition (`startProcessing`,
+  `startQuery`, `completeQuery`, `finalizeQuery`, stop-request variants,
+  interrupt begin/end/consume, generation increment) and the
+  `isQueryRunning`/`isQueryProcessing` predicates; the shared
+  `ActivityState` vocabulary ('idle' | 'working' | 'waiting').
+- **Does NOT cover**: the session object itself (stores, serialization,
+  session keys, thread/workdir wiring), soma-work's SessionRegistry
+  persistence policy (idle-only saves), any UI state.
+- **Overlap decision** (2026-08-22, Step 4a): new module — compared against
+  existing domains (disjoint: command classification / time semantics vs
+  session lifecycle). Origin: soma `src/core/session/state-machine.ts`
+  (moved verbatim; soma-originated → Rinaldi MIT attribution added to
+  LICENSE). soma-work counterpart is the identical `ActivityState` union in
+  `src/types.ts` (adopts the shared type this step; its ad-hoc registry
+  transitions are a later sub-step). Keywords: session, state machine,
+  activity state, query state, interrupt, stop request, generation, idle,
+  working, waiting.

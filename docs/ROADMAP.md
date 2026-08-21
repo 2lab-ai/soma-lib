@@ -119,6 +119,21 @@ First ports/adapters-layer entries:
   later; its storage-driven multi-job loop stays app-side until a JobStore
   port exists.
 
+### Step 4a — session-state domain ✅ (2026-08-22, v0.5.0)
+
+- Extracted soma's session state machine verbatim as
+  `src/domain/session-state` (pure transition algebra: ActivityState +
+  QueryState, stop/interrupt flags, generation fencing). soma's
+  `state-machine.ts` became a re-export; its own suite now exercises the
+  shared implementation.
+- soma-work adopts the shared `ActivityState` TYPE (its `src/types.ts` union
+  was literally identical) — type-level convergence, zero behavior change.
+  Migrating SessionRegistry's ad-hoc activity transitions onto the shared
+  algebra is sub-step 4b+ (needs its own design: persistence policy couples
+  state changes to disk I/O).
+- First soma-originated extraction → Rinaldi MIT attribution appended to
+  LICENSE (roadmap principle 6).
+
 ## Candidate backlog (suggested order — re-evaluate each step)
 
 3c. **cron job/scheduling ports, continued** — `JobStore` port (soma-work
