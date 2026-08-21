@@ -137,3 +137,34 @@ describe("coverage for remaining transitions", () => {
     expect(consumed.nextState.stopRequested).toBe(true); // only an actual interrupt clears it
   });
 });
+
+describe("predicate table + immutability contracts (review nice-to-have)", () => {
+  test("both predicates across every QueryState", () => {
+    const table: Array<[string, boolean, boolean]> = [
+      // [queryState, isQueryProcessing, isQueryRunning]
+      ["idle", false, false],
+      ["preparing", true, false],
+      ["running", true, true],
+      ["aborting", true, true],
+      ["completing", true, true],
+    ];
+    for (const [qs, processing, running] of table) {
+      const state = api.transitionQueryState(api.createInitialSessionRuntimeState(), qs as api.QueryState);
+      expect(api.isQueryProcessing(state)).toBe(processing);
+      expect(api.isQueryRunning(state)).toBe(running);
+    }
+  });
+
+  test("transitions never mutate their input state", () => {
+    const initial = api.createInitialSessionRuntimeState();
+    const frozen = Object.freeze({ ...initial });
+    api.startProcessingTransition(frozen);
+    api.startQueryTransition(frozen);
+    api.requestStopDuringRunningTransition(frozen);
+    api.markInterruptFlag(frozen);
+    api.beginInterruptTransition(frozen);
+    api.consumeInterruptFlagTransition(frozen);
+    api.incrementGenerationTransition(frozen);
+    expect(frozen).toEqual(initial); // frozen input unchanged — throws above if mutated in strict mode
+  });
+});
