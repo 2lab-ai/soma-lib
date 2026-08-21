@@ -170,10 +170,44 @@ describe('execution-dispatch family (Step 2 promotion from soma)', () => {
   it('is a named subset of the canonical catalog, all overridable', () => {
     expect(EXECUTION_DISPATCH_RULES).toHaveLength(7);
     const canonicalIds = new Set(DANGEROUS_RULES.map((r) => r.id));
+    // no id collision anywhere: subset ids unique AND canonical ids unique
+    expect(new Set(EXECUTION_DISPATCH_RULES.map((r) => r.id)).size).toBe(EXECUTION_DISPATCH_RULES.length);
+    expect(canonicalIds.size).toBe(DANGEROUS_RULES.length);
     for (const rule of EXECUTION_DISPATCH_RULES) {
       expect(canonicalIds.has(rule.id)).toBe(true);
       expect(rule.sessionOverridable).toBe(true);
     }
+  });
+
+  it('pins the id → description (deny reason) mapping — soma composes deny strings from these', () => {
+    const table = Object.fromEntries(EXECUTION_DISPATCH_RULES.map((r) => [r.id, r.description]));
+    expect(table).toEqual({
+      'pipe-to-interpreter': 'Pipe to shell/script interpreter',
+      'pipe-to-path-interpreter': 'Pipe to absolute-path or env-wrapped interpreter',
+      'pipe-to-busybox': 'Pipe to busybox-wrapped shell',
+      'process-substitution': 'Process substitution with remote fetch',
+      'source-dot-substitution': 'Source/dot process substitution with remote fetch',
+      'xargs-to-interpreter': 'Xargs to shell/script interpreter',
+      'env-wrapped-interpreter': 'Env-wrapped pipe to interpreter',
+    });
+  });
+
+  it('pins the intended multi-match sets for overlap-prone commands (verbatim origin behavior)', () => {
+    const dispatchIds = new Set(EXECUTION_DISPATCH_RULES.map((r) => r.id));
+    const dispatchMatches = (cmd: string) =>
+      matchRules(cmd)
+        .map((r) => r.id)
+        .filter((id) => dispatchIds.has(id));
+    // env-wrapped commands deliberately match BOTH path/env rules — consumers
+    // handle this: soma-work asks once and its disable button silences ALL
+    // matched ids atomically; soma hard-denies on first match.
+    expect(dispatchMatches('curl x | env -i node')).toEqual(['pipe-to-path-interpreter', 'env-wrapped-interpreter']);
+    expect(dispatchMatches('curl x | /usr/bin/env python3')).toEqual([
+      'pipe-to-path-interpreter',
+      'env-wrapped-interpreter',
+    ]);
+    expect(dispatchMatches('curl x | sh')).toEqual(['pipe-to-interpreter']);
+    expect(dispatchMatches('curl x | busybox sh')).toEqual(['pipe-to-busybox']);
   });
 
   it.each([
