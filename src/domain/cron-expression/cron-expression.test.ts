@@ -43,6 +43,19 @@ describe('matchesCronExpression', () => {
     expect(matchesCronExpression('0 9 * * 7', sun)).toBe(true);
   });
 
+  it('honors the 0===7 alias in ranges, steps, and lists (v0.3.1 fix)', () => {
+    // 2026-03-29 is Sunday (dow=0), 2026-03-28 is Saturday (dow=6) in UTC
+    const sun = new Date('2026-03-29T09:00:00Z');
+    const sat = new Date('2026-03-28T09:00:00Z');
+    expect(matchesCronExpression('0 9 * * 5-7', sun)).toBe(true); // Fri-Sun includes Sunday
+    expect(matchesCronExpression('0 9 * * 5-7', sat)).toBe(true); // and Saturday
+    expect(matchesCronExpression('0 9 * * 5-6', sun)).toBe(false); // Fri-Sat excludes Sunday
+    expect(matchesCronExpression('0 9 * * 5-7/2', sun)).toBe(true); // 5,7 → Sunday via alias
+    expect(matchesCronExpression('0 9 * * 5-7/2', sat)).toBe(false); // 5,7 — Saturday(6) not in step
+    expect(matchesCronExpression('0 9 * * 1,7', sun)).toBe(true); // list containing 7
+    expect(matchesCronExpression('0 9 * * 1-3', sun)).toBe(false); // no false positive
+  });
+
   it('rejects invalid expression', () => {
     const date = new Date();
     expect(matchesCronExpression('invalid', date)).toBe(false);

@@ -34,12 +34,20 @@ export function matchesCronExpression(expression: string, date: Date): boolean {
   const month = date.getUTCMonth() + 1; // 1-based
   const dow = date.getUTCDay(); // 0=Sunday
 
+  // Day-of-week: 0 and 7 both mean Sunday. Evaluate Sunday under BOTH aliases
+  // so ranges and steps honor the contract too — `5-7` and `5-7/1` must match
+  // Sunday (runtime value 0), not just the exact number `7`. (Fixed in
+  // v0.3.1 — the origin implementation aliased exact numbers only, silently
+  // skipping Sunday for ranges ending in 7, diverging from standard cron.)
+  const dowMatches =
+    matchField(fields[4] as string, dow, 0, 7) || (dow === 0 && matchField(fields[4] as string, 7, 0, 7));
+
   return (
     matchField(fields[0] as string, minute, 0, 59) &&
     matchField(fields[1] as string, hour, 0, 23) &&
     matchField(fields[2] as string, dom, 1, 31) &&
     matchField(fields[3] as string, month, 1, 12) &&
-    matchField(fields[4] as string, dow, 0, 7) // 0 and 7 both = Sunday
+    dowMatches
   );
 }
 
@@ -83,9 +91,11 @@ function matchPart(part: string, value: number, min: number, max: number): boole
     return value >= start && value <= end;
   }
 
-  // Exact number
+  // Exact number. (Sunday 0===7 aliasing happens at the field level in
+  // matchesCronExpression — the value is evaluated under both aliases — so
+  // no special case is needed here.)
   const num = parseInt(part, 10);
-  return num === value || (max === 7 && num === 7 && value === 0); // Sunday: 0 === 7
+  return num === value;
 }
 
 export function isValidCronExpression(expression: string): boolean {

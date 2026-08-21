@@ -80,6 +80,13 @@ Per-rule decisions:
   Migrating soma's scheduler onto the shared engine = separate backlog item
   (behavior change: croner's syntax surface ≠ this engine's; needs its own
   per-feature review like Step 2's catalog merge).
+- **v0.3.1 behavior fix** (dual-review catch): the origin engine aliased
+  Sunday 0===7 for exact numbers only — `5-7` / `5-7/1` silently skipped
+  Sunday, diverging from standard cron. Sunday is now evaluated under both
+  aliases at the field level. Deliberate, documented deviation from the
+  extraction-is-a-move rule; pinned by range/step/list alias tests, and the
+  test runner is pinned to TZ=Asia/Seoul so the UTC contract is exercised
+  under a non-UTC process timezone.
 
 ## Candidate backlog (suggested order — re-evaluate each step)
 
