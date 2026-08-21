@@ -22,6 +22,10 @@ to physically merge the repos.
 5. Each step's receipt: soma-lib `npm run check` green + both consumers' own
    gates green (`bun test`/typecheck for soma, `npm run lint && npm test` for
    soma-work) + external review.
+6. **License provenance.** soma derives from Fabrizio Rinaldi's MIT
+   claude-telegram-bot — any future extraction of soma-originated code into
+   soma-lib must carry his MIT attribution alongside ours. Step 1 code is
+   soma-work-originated (2lab.ai).
 
 ## Step log
 
