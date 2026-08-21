@@ -26,6 +26,12 @@ to physically merge the repos.
    claude-telegram-bot — any future extraction of soma-originated code into
    soma-lib must carry his MIT attribution alongside ours. Step 1 code is
    soma-work-originated (2lab.ai).
+7. **Update-vs-new gate.** Before any module is added, the extraction protocol
+   in CLAUDE.md runs: read MODULES.md, search for overlap, decide
+   extend-vs-new, record the decision in the module's MODULES.md entry. CI
+   enforces entry presence + the Overlap decision field
+   (`scripts/check-module-inventory.sh`) — near-duplicate modules must not
+   accumulate.
 
 ## Step log
 

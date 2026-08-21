@@ -24,10 +24,15 @@ if ! gh release view v0.1.0 --repo 2lab-ai/soma-lib >/dev/null 2>&1; then
     --title "v0.1.0" --notes "Step 1: command-safety domain (extracted from soma-work) + createRuleSet engine. See docs/ROADMAP.md."
 fi
 
-echo "=== 2/4 soma-work: lockfile against the live release, push, PR ==="
+echo "=== 2/4 soma-work: lockfile against the live release, deploy-equivalent smoke, push, PR ==="
 cd "$SW"
 npm install --no-fund --no-audit   # resolves the release tarball URL into package-lock.json
-npm run build:somalib >/dev/null
+npm run build:somalib >/dev/null && npm run build:packages >/dev/null
+# Deploy-equivalent smoke (review MUST-FIX B2): compiled CJS re-export chains
+# must reach soma-lib at runtime — parent path and the separately-built
+# process-shared path the MCP children use.
+node -e "const m=require('./somalib/permission/dangerous-rules.js');if(m.DANGEROUS_RULES.length<14)throw new Error('parent re-export broken');console.log('parent CJS re-export: OK')"
+node -e "const m=require('./packages/process-shared/dist/permission/dangerous-rules.js');if(m.overridableMatchedRuleIds('kill -9 1').length===0)throw new Error('process-shared re-export broken');console.log('process-shared CJS re-export: OK')"
 git add package-lock.json && git commit -m "chore: lock soma-lib release tarball
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>" || echo "lockfile already committed"
