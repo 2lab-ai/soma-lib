@@ -1,0 +1,5 @@
+node_modules/
+*.tgz
+# dist/ is COMMITTED on purpose — consumers install release tarballs and
+# tsc(moduleResolution:node) consumers resolve types from dist/*.d.ts without
+# any install-time build step. CI verifies dist freshness.
