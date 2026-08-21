@@ -26,3 +26,4 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * added when the surface grows enough to collide.
  */
 __exportStar(require("./domain/command-safety"), exports);
+__exportStar(require("./domain/cron-expression"), exports);

@@ -69,12 +69,26 @@ Per-rule decisions:
   deny-reason strings preserved). `BLOCKED_PATTERNS` substring denies stay
   app-side (personal policy).
 
+### Step 3 — cron-expression domain ✅ (2026-08-21, v0.3.0)
+
+- Extracted soma-work's hand-rolled 5-field engine (`matchesCronExpression`,
+  `isValidCronExpression`, `isValidCronName`) verbatim as
+  `src/domain/cron-expression` — UTC semantics and the B1 timezone test
+  family preserved. soma-work's `somalib/cron/cron-storage.ts` became a
+  re-export for these three (storage adapter + job model stay app-side).
+- Scope deliberately narrow: soma still schedules with `croner` (timer-based).
+  Migrating soma's scheduler onto the shared engine = separate backlog item
+  (behavior change: croner's syntax surface ≠ this engine's; needs its own
+  per-feature review like Step 2's catalog merge).
+
 ## Candidate backlog (suggested order — re-evaluate each step)
 
-3. **cron/scheduling domain** — soma `src/scheduler/*` + `cron.yaml` vs
-   soma-work `src/cron-scheduler.ts` + `somalib/cron/cron-storage.ts`. Domain:
-   job spec, schedule computation, run-request lifecycle. Ports: `JobStore`,
-   `Clock`, `Dispatcher`.
+3b. **soma scheduler onto shared cron engine** — replace croner with
+   polling + `matchesCronExpression` (or wrap croner behind a port). Deliberate
+   behavior change; compare syntax surfaces per-field first.
+3c. **cron job/scheduling ports** — `JobStore` port (soma-work CronStorage
+   JSON vs soma cron.yaml), `Clock`, `Dispatcher`; run-request lifecycle
+   domain (dedup-by-minute, misfire policy).
 4. **session domain** — soma `src/core/session/*` (state-machine, session-key,
    serialize) vs soma-work agent-session/agent-manager. Biggest overlap,
    biggest risk; will decompose into sub-steps (state machine first, stores

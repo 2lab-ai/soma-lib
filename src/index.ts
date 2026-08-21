@@ -10,3 +10,4 @@
  * added when the surface grows enough to collide.
  */
 export * from './domain/command-safety';
+export * from './domain/cron-expression';

@@ -37,3 +37,24 @@ it for the reader who is about to duplicate you.
   (command-danger classification); compared against `DANGEROUS_RULES` (no id
   or matcher overlap) before promotion from soma `BLOCKED_EXECUTION_RULES`
   (moved verbatim, ids preserved).
+
+### src/domain/cron-expression
+
+- **Purpose**: 5-field cron expression semantics — match against a Date (UTC)
+  and validate expression/name syntax. Pure functions, no scheduling.
+- **Covers**: `matchesCronExpression` (numbers, `*`, lists, ranges, steps;
+  UTC evaluation; dow 0===7 Sunday), `isValidCronExpression` (syntax + range +
+  zero-step + reversed-range rejection), `isValidCronName`.
+- **Does NOT cover**: scheduling policy (polling loops, timers, dedup,
+  misfire/catch-up), job models (CronJob stays in soma-work; cron.yaml schema
+  stays in soma), next-run computation (nothing needs it yet), storage
+  (CronStorage adapter stays app-side until a JobStore port exists).
+- **Overlap decision** (2026-08-21, Step 3): new module — compared against
+  `command-safety` (disjoint domain: time semantics vs command classification).
+  Origin: soma-work `somalib/cron/cron-storage.ts` hand-rolled engine (moved
+  verbatim; only `as string` casts added for this repo's
+  noUncheckedIndexedAccess). soma's counterpart is the external `croner`
+  package — migrating soma's scheduler onto this engine is a deliberate
+  backlog step, not part of this extraction.
+  Keywords: cron, schedule, expression, crontab, 5-field, match, validate,
+  every minute, UTC.
