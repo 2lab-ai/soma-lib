@@ -48,9 +48,20 @@ exports.overridableMatchedRuleIds = overridableMatchedRuleIds;
 exports.overridableRulesByIds = overridableRulesByIds;
 exports.isCrossUserAccess = isCrossUserAccess;
 exports.isSshCommand = isSshCommand;
-/** Build a matching engine bound to `rules`. The id→rule map is built once. */
+/**
+ * Build a matching engine bound to `rules`. The id→rule map is built once.
+ * Throws on duplicate rule ids — ids key override/disable sets, so a catalog
+ * where two rules share an id is a bug at the definition site, not something
+ * to resolve silently by last-write-wins.
+ */
 function createRuleSet(rules) {
-    const byId = new Map(rules.map((r) => [r.id, r]));
+    const byId = new Map();
+    for (const rule of rules) {
+        if (byId.has(rule.id)) {
+            throw new Error(`createRuleSet: duplicate rule id "${rule.id}"`);
+        }
+        byId.set(rule.id, rule);
+    }
     return {
         rules,
         matchRules(command, ctx = {}) {
@@ -59,8 +70,8 @@ function createRuleSet(rules) {
         rulesByIds(ruleIds) {
             return ruleIds.map((id) => byId.get(id)).filter((r) => r !== undefined);
         },
-        overridableMatchedRuleIds(command) {
-            return rules.filter((rule) => rule.sessionOverridable && rule.match(command, {})).map((rule) => rule.id);
+        overridableMatchedRuleIds(command, ctx = {}) {
+            return rules.filter((rule) => rule.sessionOverridable && rule.match(command, ctx)).map((rule) => rule.id);
         },
         overridableRulesByIds(ruleIds) {
             return ruleIds

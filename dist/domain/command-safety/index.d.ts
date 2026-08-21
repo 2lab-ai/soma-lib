@@ -81,12 +81,22 @@ export interface RuleSet {
     matchRules(command: string, ctx?: DangerousRuleContext): DangerousRule[];
     /** Lookup by id over the FULL catalog. Order preserved; unknown ids dropped. */
     rulesByIds(ruleIds: ReadonlyArray<string>): DangerousRule[];
-    /** Matched ids over the OVERRIDABLE subset only (lockdown ids never appear). */
-    overridableMatchedRuleIds(command: string): string[];
+    /**
+     * Matched ids over the OVERRIDABLE subset only (lockdown ids never appear).
+     * `ctx` defaults to `{}`, matching the historical canonical behavior —
+     * context-sensitive overridable rules only participate when the caller
+     * passes their context.
+     */
+    overridableMatchedRuleIds(command: string, ctx?: DangerousRuleContext): string[];
     /** Lookup by id over the OVERRIDABLE subset only (lockdown/unknown ids dropped). */
     overridableRulesByIds(ruleIds: ReadonlyArray<string>): DangerousRule[];
 }
-/** Build a matching engine bound to `rules`. The id→rule map is built once. */
+/**
+ * Build a matching engine bound to `rules`. The id→rule map is built once.
+ * Throws on duplicate rule ids — ids key override/disable sets, so a catalog
+ * where two rules share an id is a bug at the definition site, not something
+ * to resolve silently by last-write-wins.
+ */
 export declare function createRuleSet(rules: ReadonlyArray<DangerousRule>): RuleSet;
 /**
  * Canonical shared catalog. Declared once, consumed by:

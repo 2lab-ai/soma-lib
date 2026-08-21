@@ -136,6 +136,33 @@ describe('createRuleSet (project-specific catalogs)', () => {
     expect(ctxSet.matchRules('anything', { userId: 'U1' }).map((r) => r.id)).toEqual(['ctx-echo']);
     expect(ctxSet.matchRules('anything')).toEqual([]);
   });
+
+  it('passes context through the overridable flow too', () => {
+    const ctxRules: ReadonlyArray<DangerousRule> = [
+      {
+        id: 'ctx-overridable',
+        label: 'ctx overridable',
+        description: 'context-sensitive overridable rule',
+        sessionOverridable: true,
+        match: (_cmd, ctx) => ctx.userId === 'U1',
+      },
+    ];
+    const ctxSet = createRuleSet(ctxRules);
+    expect(ctxSet.overridableMatchedRuleIds('anything', { userId: 'U1' })).toEqual(['ctx-overridable']);
+    // default ctx = {} preserves the historical canonical behavior
+    expect(ctxSet.overridableMatchedRuleIds('anything')).toEqual([]);
+  });
+
+  it('rejects duplicate rule ids at construction', () => {
+    const dup: DangerousRule = {
+      id: 'dup',
+      label: 'dup',
+      description: 'dup',
+      sessionOverridable: true,
+      match: () => false,
+    };
+    expect(() => createRuleSet([dup, { ...dup, label: 'dup2' }])).toThrow(/duplicate rule id "dup"/);
+  });
 });
 
 describe('isSshCommand', () => {

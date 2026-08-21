@@ -84,15 +84,31 @@ export interface RuleSet {
   matchRules(command: string, ctx?: DangerousRuleContext): DangerousRule[];
   /** Lookup by id over the FULL catalog. Order preserved; unknown ids dropped. */
   rulesByIds(ruleIds: ReadonlyArray<string>): DangerousRule[];
-  /** Matched ids over the OVERRIDABLE subset only (lockdown ids never appear). */
-  overridableMatchedRuleIds(command: string): string[];
+  /**
+   * Matched ids over the OVERRIDABLE subset only (lockdown ids never appear).
+   * `ctx` defaults to `{}`, matching the historical canonical behavior —
+   * context-sensitive overridable rules only participate when the caller
+   * passes their context.
+   */
+  overridableMatchedRuleIds(command: string, ctx?: DangerousRuleContext): string[];
   /** Lookup by id over the OVERRIDABLE subset only (lockdown/unknown ids dropped). */
   overridableRulesByIds(ruleIds: ReadonlyArray<string>): DangerousRule[];
 }
 
-/** Build a matching engine bound to `rules`. The id→rule map is built once. */
+/**
+ * Build a matching engine bound to `rules`. The id→rule map is built once.
+ * Throws on duplicate rule ids — ids key override/disable sets, so a catalog
+ * where two rules share an id is a bug at the definition site, not something
+ * to resolve silently by last-write-wins.
+ */
 export function createRuleSet(rules: ReadonlyArray<DangerousRule>): RuleSet {
-  const byId: ReadonlyMap<string, DangerousRule> = new Map(rules.map((r) => [r.id, r]));
+  const byId = new Map<string, DangerousRule>();
+  for (const rule of rules) {
+    if (byId.has(rule.id)) {
+      throw new Error(`createRuleSet: duplicate rule id "${rule.id}"`);
+    }
+    byId.set(rule.id, rule);
+  }
   return {
     rules,
     matchRules(command, ctx = {}) {
@@ -101,8 +117,8 @@ export function createRuleSet(rules: ReadonlyArray<DangerousRule>): RuleSet {
     rulesByIds(ruleIds) {
       return ruleIds.map((id) => byId.get(id)).filter((r): r is DangerousRule => r !== undefined);
     },
-    overridableMatchedRuleIds(command) {
-      return rules.filter((rule) => rule.sessionOverridable && rule.match(command, {})).map((rule) => rule.id);
+    overridableMatchedRuleIds(command, ctx = {}) {
+      return rules.filter((rule) => rule.sessionOverridable && rule.match(command, ctx)).map((rule) => rule.id);
     },
     overridableRulesByIds(ruleIds) {
       return ruleIds

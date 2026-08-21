@@ -23,3 +23,6 @@ jobs:
             echo "::error::dist/ is stale — run 'npm run build' and commit the result."
             exit 1
           }
+      - uses: oven-sh/setup-bun@v2
+      - name: Package-boundary smoke (packed tarball via node CJS + tsc + bun)
+        run: ./scripts/smoke-pack.sh
