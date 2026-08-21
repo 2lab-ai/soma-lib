@@ -58,3 +58,35 @@ it for the reader who is about to duplicate you.
   backlog step, not part of this extraction.
   Keywords: cron, schedule, expression, crontab, 5-field, match, validate,
   every minute, UTC.
+
+### src/ports/cron-scheduling
+
+- **Purpose**: the contract by which an app hands recurring work to a
+  scheduler — `CronJobFactory(expression, onTick) → CronJobHandle {stop,
+  nextRun}` + injectable `CronTimers`.
+- **Covers**: the type contract only (creation-time throw on invalid
+  expression is part of the contract).
+- **Does NOT cover**: any implementation (see adapters), job persistence,
+  run-request lifecycle, catch-up policy.
+- **Overlap decision** (2026-08-21, Step 3b): new module — first ports-layer
+  entry; formalizes the injection seam soma's scheduler already had
+  (`SchedulerServiceDependencies.createCronJob`, previously satisfied by
+  croner). Keywords: port, scheduler, factory, job handle, timers.
+
+### src/adapters/minute-cron-job
+
+- **Purpose**: croner-free `CronJobFactory` implementation over
+  `domain/cron-expression` — polls (default 20s), fires at most once per
+  matching calendar minute, `nextRun()` via bounded forward scan.
+- **Covers**: wall-clock modes 'local' (croner parity — soma cron.yaml) and
+  'utc' (soma-work model); creation-time validation; onTickError isolation;
+  injectable timers/clock for tests.
+- **Does NOT cover**: seconds-precision firing, 6-field/named/alias
+  expressions, vixie dom/dow OR-combination (engine ANDs all fields), missed-
+  minute catch-up after process sleep.
+- **Overlap decision** (2026-08-21, Step 3b): new module — first
+  adapters-layer entry; compared against `domain/cron-expression` (this is
+  its consumer, not a duplicate) and soma-work's CronScheduler tick loop
+  (storage-driven multi-job loop — candidate to adopt this adapter later,
+  noted in ROADMAP backlog). Keywords: croner replacement, polling scheduler,
+  minute dedup, wall clock, timezone, nextRun.

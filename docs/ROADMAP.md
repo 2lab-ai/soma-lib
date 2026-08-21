@@ -88,14 +88,34 @@ Per-rule decisions:
   test runner is pinned to TZ=Asia/Seoul so the UTC contract is exercised
   under a non-UTC process timezone.
 
+### Step 3b — soma scheduler onto the shared engine ✅ (2026-08-21, v0.4.0)
+
+First ports/adapters-layer entries:
+
+- `ports/cron-scheduling` formalizes the seam soma already injected
+  (`createCronJob(expr, onTick) → {stop, nextRun}`); creation-time throw on
+  invalid expressions is part of the contract.
+- `adapters/minute-cron-job` implements it croner-free over the shared
+  engine: 20s poll, at-most-once-per-matching-minute (soma-work's dedup
+  model), bounded forward scan for `nextRun()`, `onTickError` isolation, and
+  wall-clock modes — **'local' default for croner parity** (soma cron.yaml
+  reads "0 9 * * *" as 9am host-local), 'utc' for the soma-work model.
+- soma swaps its default factory to the adapter and drops the croner
+  dependency. Documented divergences from croner: sub-minute firing time
+  (within the minute, not second 0), 5-field numeric only (stricter
+  validation), dom/dow ANDed (no vixie OR).
+- 3c note: `matchesCronExpression`-based fire policy in soma-work's
+  CronScheduler tick loop is now a candidate to adopt this adapter/portfolio
+  later; its storage-driven multi-job loop stays app-side until a JobStore
+  port exists.
+
 ## Candidate backlog (suggested order — re-evaluate each step)
 
-3b. **soma scheduler onto shared cron engine** — replace croner with
-   polling + `matchesCronExpression` (or wrap croner behind a port). Deliberate
-   behavior change; compare syntax surfaces per-field first.
-3c. **cron job/scheduling ports** — `JobStore` port (soma-work CronStorage
-   JSON vs soma cron.yaml), `Clock`, `Dispatcher`; run-request lifecycle
-   domain (dedup-by-minute, misfire policy).
+3c. **cron job/scheduling ports, continued** — `JobStore` port (soma-work
+   CronStorage JSON vs soma cron.yaml), run-request lifecycle domain
+   (dedup-by-minute records, misfire/catch-up policy); soma-work CronScheduler
+   adoption of `adapters/minute-cron-job`. Thin on its own — bundle with the
+   next cron-adjacent need.
 4. **session domain** — soma `src/core/session/*` (state-machine, session-key,
    serialize) vs soma-work agent-session/agent-manager. Biggest overlap,
    biggest risk; will decompose into sub-steps (state machine first, stores
