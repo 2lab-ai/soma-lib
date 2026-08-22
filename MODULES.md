@@ -113,3 +113,29 @@ it for the reader who is about to duplicate you.
   transitions are a later sub-step). Keywords: session, state machine,
   activity state, query state, interrupt, stop request, generation, idle,
   working, waiting.
+
+### src/domain/session-identity
+
+- **Purpose**: session identity model — branded (tenantId, channelId,
+  threadId) triplet with two canonical encodings: session key
+  `tenant:channel:thread` and storage partition `tenant/channel/thread`;
+  symmetric build/parse with machine-readable invariant errors.
+- **Covers**: branded id types + `to*Id` validators (empty / separator
+  rejection), `createSessionIdentity`, `buildSessionKey(/FromInput)`,
+  `parseSessionKey`, `buildStoragePartitionKey(/FromInput)`,
+  `parseStoragePartitionKey`, `SessionIdentityInvariantError` (coded),
+  `sessionKeyContract` object.
+- **Does NOT cover**: soma's Telegram delivery policy
+  (`resolveSendFileChatId`) and scheduler tenant convention
+  (`SCHEDULER_TENANT_ID`) — app-side; soma's on-disk `serializeSessionData`
+  (app persistence glue); soma-work's current `channel-threadTs` key (ad hoc
+  in SessionRegistry — adopting this model there = persisted-key migration,
+  ROADMAP backlog).
+- **Overlap decision** (2026-08-22, Step 4b): new module — compared against
+  `session-state` (same session domain family but disjoint concern: identity
+  vs runtime algebra; kept separate so soma-work can adopt identity without
+  the state machine and vice versa). Origin: soma
+  `src/core/routing/session-key.ts` generic portion (moved verbatim;
+  soma-originated → Rinaldi attribution already in LICENSE). Keywords:
+  session key, tenant, channel, thread, identity, storage partition, branded
+  type, parse, invariant.

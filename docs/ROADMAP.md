@@ -134,6 +134,18 @@ First ports/adapters-layer entries:
 - First soma-originated extraction → Rinaldi MIT attribution appended to
   LICENSE (roadmap principle 6).
 
+### Step 4b — session-identity domain ✅ (2026-08-22, v0.6.0)
+
+- Extracted the generic portion of soma's `session-key.ts` verbatim as
+  `src/domain/session-identity` (branded triplet, key/partition
+  encode/decode, coded invariant errors). soma's file became a re-export
+  plus its two app-side pieces (`SCHEDULER_TENANT_ID`, Telegram
+  `resolveSendFileChatId`).
+- soma-work NOT switched: its key is `channel-threadTs` (no tenant, ad hoc)
+  — adopting the shared identity model means migrating persisted session
+  keys; recorded as a deliberate backlog item (4d) with that migration
+  concern, not smuggled in.
+
 ## Candidate backlog (suggested order — re-evaluate each step)
 
 3c. **cron job/scheduling ports, continued** — `JobStore` port (soma-work
