@@ -146,6 +146,29 @@ First ports/adapters-layer entries:
   keys; recorded as a deliberate backlog item (4d) with that migration
   concern, not smuggled in.
 
+### Step 4d — soma-work session keys onto the shared identity model ✅ (2026-08-22)
+
+- soma-work's ad-hoc `<channel>-<threadTs|direct>` session key becomes
+  `work:<channel>:<threadTs|direct>` via the shared `domain/session-identity`
+  (tenant = `work`; dep bump v0.5.0 → v0.6.0). New app-side
+  `src/session-identity.ts` is the single construction source; the four
+  inline format duplicates (registry ×2, cron scheduler, metrics emitter,
+  dashboard) now route through it.
+- Migration model, both persistence surfaces: **sessions.json** — the loader
+  derives map keys from persisted channel/thread fields (never trusts
+  `serialized.key`), so old files migrate automatically; **Slack action
+  payloads** — pre-deploy buttons carry old keys, every public by-key
+  registry entry normalizes them.
+- Dual-review round 1 caught 3 real defects, all fixed: rollback safety
+  (persisted `key` field stays in LEGACY form — its only consumer is a
+  rolled-back pre-4d binary; the new loader ignores it), corrupt-record
+  quarantine in loadSessions (one bad record no longer aborts the rest),
+  and metrics normalize-on-read (a session spanning the deploy no longer
+  splits into two report rows).
+- Thread aggregation switched from key-equality to field matching — the
+  shared builder rejects separator characters, and aggregation must stay
+  total over hostile data (pinned by the dashboard hostile-key test).
+
 ## Candidate backlog (suggested order — re-evaluate each step)
 
 3c. **cron job/scheduling ports, continued** — `JobStore` port (soma-work
@@ -153,10 +176,14 @@ First ports/adapters-layer entries:
    (dedup-by-minute records, misfire/catch-up policy); soma-work CronScheduler
    adoption of `adapters/minute-cron-job`. Thin on its own — bundle with the
    next cron-adjacent need.
-4. **session domain** — soma `src/core/session/*` (state-machine, session-key,
-   serialize) vs soma-work agent-session/agent-manager. Biggest overlap,
-   biggest risk; will decompose into sub-steps (state machine first, stores
-   later).
+4e. **SessionRegistry transitions onto the shared algebra** — soma-work's
+   ad-hoc `activityState` mutations adopt `domain/session-state` transitions.
+   Needs its own design: persistence policy (idle-only saves) couples state
+   changes to disk I/O.
+   (4c "session store/serialization" was DELETED as a standalone step,
+   2026-08-22: measured overlap is nil — soma's `serializeSessionData` is
+   23 lines of app glue, soma-work's `SerializedSession` is a different
+   shape entirely. Absorbed into 4d/4e where relevant.)
 5. **provider orchestration ports** — soma `src/providers/*` (claude/codex
    adapters, retry policy, error normalizer) vs soma-work claude-handler. Port:
    `EngineAdapter`; domain: retry/error policy.
