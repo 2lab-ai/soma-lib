@@ -46,7 +46,12 @@ function cleanStringList(value: unknown): string[] {
 }
 
 /**
- * Defensive normalization of catalog rows (wire or snapshot). Never throws.
+ * Defensive normalization of catalog rows (wire or snapshot): any JSON shape
+ * is tolerated (non-objects, missing/typed-wrong fields, duplicate ids) and
+ * never throws on row *content*. An exception thrown by the caller-supplied
+ * `fallbackGroup` is a caller bug and is NOT swallowed — it propagates.
+ * The callback's result is trimmed and lowercased so `group` keeps the
+ * documented invariant whether it was declared or inferred.
  */
 export function normalizeCatalogEntries(
   raw: readonly unknown[],
@@ -73,7 +78,9 @@ export function normalizeCatalogEntries(
         ? e.group.trim().toLowerCase()
         : "";
     const group =
-      declaredGroup.length > 0 ? declaredGroup : (options.fallbackGroup?.(id) ?? "");
+      declaredGroup.length > 0
+        ? declaredGroup
+        : (options.fallbackGroup?.(id) ?? "").trim().toLowerCase();
 
     out.push({
       id,

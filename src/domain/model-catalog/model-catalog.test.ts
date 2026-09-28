@@ -83,8 +83,25 @@ describe("normalizeCatalogEntries", () => {
     expect(normalizeCatalogEntries([{ id: "q" }])[0]?.group).toBe("");
   });
 
-  test("never throws on garbage input", () => {
+  test("group from fallbackGroup is normalized like a declared group (review P3)", () => {
+    const rows = normalizeCatalogEntries([{ id: "gpt-y" }], {
+      fallbackGroup: () => " Codex ",
+    });
+    expect(rows[0]?.group).toBe("codex");
+  });
+
+  test("never throws on garbage row content", () => {
     expect(normalizeCatalogEntries([undefined, 1, [], () => 0] as unknown[])).toEqual([]);
+  });
+
+  test("a throwing fallbackGroup is a caller bug and propagates (review P3)", () => {
+    expect(() =>
+      normalizeCatalogEntries([{ id: "gpt-y" }], {
+        fallbackGroup: () => {
+          throw new Error("caller bug");
+        },
+      })
+    ).toThrow("caller bug");
   });
 });
 
