@@ -11,6 +11,8 @@
  */
 export * from './domain/command-safety';
 export * from './domain/cron-expression';
+export * from './domain/model-catalog';
+export * from './domain/model-effort';
 export * from './domain/session-identity';
 export * from './domain/session-state';
 export * from './ports/cron-scheduling';

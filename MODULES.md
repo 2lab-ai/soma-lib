@@ -139,3 +139,47 @@ it for the reader who is about to duplicate you.
   soma-originated → Rinaldi attribution already in LICENSE). Keywords:
   session key, tenant, channel, thread, identity, storage partition, branded
   type, parse, invariant.
+
+### src/domain/model-effort
+
+- **Purpose**: the reasoning-effort vocabulary — canonical level set +
+  ordering, the SDK-accepted subset, input normalization, and the clamp rule
+  applied when a model does not offer a requested level.
+- **Covers**: `EFFORT_LEVELS` (low…ultra) / `SDK_EFFORT_LEVELS` (low…max,
+  what Claude Code `--effort` accepts), `EffortLevel`/`SdkEffortLevel`,
+  `isEffortLevel`/`isSdkEffortLevel`, `normalizeEffortInput`, `effortRank`,
+  `compareEffort`, `rankSupportedEfforts`, `clampEffortToSupported(menu,
+  effort)`.
+- **Does NOT cover**: which levels a given model supports (that is catalog
+  state — each app's catalog store answers `getEffortsFor(model)`), how an
+  out-of-SDK level (`ultra`) is transported to the API (app/provider-adapter
+  concern), per-user/per-context persistence of a chosen level, thinking-token
+  budgets (soma's legacy `REASONING_TOKENS`, retired in favour of levels).
+- **Overlap decision** (2026-09-28, Step 5a): new module — compared against
+  every existing domain (disjoint: command/time/session concerns). Origin:
+  soma-work `src/model-catalog.ts` `CANONICAL_EFFORT_ORDER` +
+  `clampEffortToModel` (semantics moved verbatim, catalog singleton
+  parameterized away) and `src/user-settings-store.ts` `EFFORT_LEVELS`;
+  soma had no level vocabulary (token budgets) and adopts this one. Keywords:
+  effort, reasoning effort, xhigh, max, ultra, clamp, output_config.
+
+### src/domain/model-catalog
+
+- **Purpose**: the normalized shape of one llmux `/llmux/models` row
+  (`CatalogModel`) and the defensive wire/snapshot → row normalizer.
+- **Covers**: `CatalogModel` (id, name, group, efforts, aliases, maxContext),
+  `normalizeCatalogEntries(raw, {fallbackGroup})` — trims, lowercases the
+  list fields, accepts both `max_context` and `maxContext`, drops id-less
+  rows, dedupes ids case-insensitively.
+- **Does NOT cover**: the catalog store (fetch cadence, cooldowns, snapshot
+  file, in-flight dedup), menu policy (soma's "shorthand means 1M" hiding,
+  static-roster floors), alias resolution, context-window workarounds — all
+  app-side runtime policy.
+- **Overlap decision** (2026-09-28, Step 5a): new module — kept separate from
+  `model-effort` (a row is data; effort is a vocabulary with an ordering —
+  soma-work's user-settings layer needs the latter without the former).
+  Origin: the two near-identical `normalizeEntries` functions in soma
+  `src/config/model-catalog.ts` and soma-work `src/model-catalog.ts` (only
+  difference — soma infers a group from the id prefix — became the
+  `fallbackGroup` option). Keywords: llmux, model catalog, /llmux/models,
+  max_context, efforts, aliases, snapshot, normalize.

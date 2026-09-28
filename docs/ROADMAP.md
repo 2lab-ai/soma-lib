@@ -169,6 +169,24 @@ First ports/adapters-layer entries:
   shared builder rejects separator characters, and aggregation must stay
   total over hostile data (pinned by the dashboard hostile-key test).
 
+### Step 5a — model effort vocabulary + catalog row shape ✅ (2026-09-28, v0.7.0)
+
+- Trigger: soma's `/model` menu still offered a thinking-token budget
+  (`REASONING_TOKENS`) while soma-work already selected named effort levels
+  and clamped them to the llmux catalog menu. Same concept, two vocabularies.
+- `src/domain/model-effort`: `EFFORT_LEVELS` (low…ultra), `SDK_EFFORT_LEVELS`
+  (low…max — what `claude --effort` accepts; `ultra` is llmux/codex-only and
+  needs a body override), `clampEffortToSupported` (soma-work's
+  `clampEffortToModel` semantics, catalog singleton parameterized away),
+  `normalizeEffortInput`, ordering helpers.
+- `src/domain/model-catalog`: `CatalogModel` + `normalizeCatalogEntries` — the
+  two apps' byte-near-identical wire/snapshot normalizers, unified (soma's
+  id-prefix group inference became the `fallbackGroup` option).
+- Consumers: soma adopts levels end-to-end (config, Telegram menu, SDK
+  options); soma-work re-exports its `CANONICAL_EFFORT_ORDER` /
+  `clampEffortToModel` / `normalizeEntries` from here (zero call-site
+  changes).
+
 ## Candidate backlog (suggested order — re-evaluate each step)
 
 3c. **cron job/scheduling ports, continued** — `JobStore` port (soma-work
