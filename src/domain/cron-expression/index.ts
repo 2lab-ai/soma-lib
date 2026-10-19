@@ -14,9 +14,9 @@
  *   - soma-work: CronScheduler polls every minute and calls
  *     `matchesCronExpression(job.expression, now)`; the Slack cron UI calls
  *     `isValidCronExpression` / `isValidCronName` on user input.
- *   - soma: still schedules with the `croner` package (timer-based, its own
- *     syntax surface). Migrating soma's scheduler onto this engine is a
- *     deliberate future step (see ROADMAP backlog), not smuggled in here.
+ *   - soma: schedules through `adapters/minute-cron-job`
+ *     (`createMinuteCronJobFactory`), which polls this engine (croner was
+ *     dropped in v0.4.0).
  */
 
 /**

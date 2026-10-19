@@ -3,7 +3,6 @@ import * as api from './index';
 import {
   beginInterruptTransition,
   clearStopRequestedTransition,
-  completeQueryTransition,
   consumeInterruptFlagTransition,
   createInitialSessionRuntimeState,
   finalizeQueryTransition,
@@ -19,7 +18,7 @@ import {
 } from './index';
 
 describe("session state-machine transitions", () => {
-  test("moves query through preparing -> running -> completing -> idle", () => {
+  test("moves query through preparing -> running -> idle", () => {
     let state = createInitialSessionRuntimeState();
     state = startProcessingTransition(state);
     expect(state.queryState).toBe("preparing");
@@ -30,9 +29,10 @@ describe("session state-machine transitions", () => {
     expect(state.stopRequested).toBe(false);
     expect(isQueryRunning(state)).toBe(true);
 
-    state = completeQueryTransition(state);
-    expect(state.queryState).toBe("completing");
-
+    // 0.8.0 removed completeQueryTransition and the "completing" state it was
+    // the only producer of: soma replaced it with finalizeQueryTransition in
+    // 435795d (a query stuck in "completing" was the bug) and neither consumer
+    // references the state since.
     state = finalizeQueryTransition(state);
     expect(state.queryState).toBe("idle");
     expect(isQueryRunning(state)).toBe(false);
@@ -84,8 +84,7 @@ describe("session state-machine transitions", () => {
     expect(consumed.nextState.stopRequested).toBe(false);
     expect(consumed.nextState.wasInterruptedByNewMessage).toBe(false);
 
-    state = completeQueryTransition(consumed.nextState);
-    state = finalizeQueryTransition(state);
+    state = finalizeQueryTransition(consumed.nextState);
     expect(state.queryState).toBe("idle");
     expect(state.stopRequested).toBe(false);
   });
@@ -146,7 +145,6 @@ describe("predicate table + immutability contracts (review nice-to-have)", () =>
       ["preparing", true, false],
       ["running", true, true],
       ["aborting", true, true],
-      ["completing", true, true],
     ];
     for (const [qs, processing, running] of table) {
       const state = api.transitionQueryState(api.createInitialSessionRuntimeState(), qs as api.QueryState);

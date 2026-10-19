@@ -122,13 +122,15 @@ it for the reader who is about to duplicate you.
   symmetric build/parse with machine-readable invariant errors.
 - **Covers**: branded id types + `to*Id` validators (empty / separator
   rejection), `createSessionIdentity`, `buildSessionKey(/FromInput)`,
-  `parseSessionKey`, `buildStoragePartitionKey(/FromInput)`,
-  `parseStoragePartitionKey`, `SessionIdentityInvariantError` (coded),
-  `sessionKeyContract` object.
+  `parseSessionKey`, `buildStoragePartitionKey`,
+  `parseStoragePartitionKey`, `SessionIdentityInvariantError` (coded).
+  (0.8.0 removed the never-adopted `buildStoragePartitionKeyFromInput`,
+  `SESSION_KEY_FORMAT`/`STORAGE_PARTITION_FORMAT` and the `sessionKeyContract`
+  object — no consumer referenced them outside re-export lines.)
 - **Does NOT cover**: soma's Telegram delivery policy
   (`resolveSendFileChatId`) and scheduler tenant convention
   (`SCHEDULER_TENANT_ID`) — app-side; soma's on-disk `serializeSessionData`
-  (app persistence glue); soma-work's current `channel-threadTs` key (ad hoc
+  (app persistence glue); soma-work's legacy `channel-threadTs` key (ad hoc
   in SessionRegistry — adopting this model there = persisted-key migration,
   ROADMAP backlog).
 - **Overlap decision** (2026-08-22, Step 4b): new module — compared against

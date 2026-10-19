@@ -19,16 +19,21 @@ cat > package.json <<EOF
 EOF
 npm install --no-fund --no-audit --silent
 
-# 1. Node CJS require — every public symbol present and functional
-node -e '
+# 1. Node CJS require — every public symbol present and functional.
+# The installed package must expose the same runtime exports as the committed
+# dist/index.js (catches a `files` / `exports` packing mistake), plus spot
+# checks across modules. Validates committed dist/; CI rebuilds and diffs it.
+ROOT="$ROOT" node -e '
 const l = require("soma-lib");
 const assert = require("assert");
-for (const k of ["DANGEROUS_RULES","createRuleSet","matchRules","rulesByIds","overridableMatchedRuleIds","overridableRulesByIds","isCrossUserAccess","isSshCommand"]) {
+const expected = Object.keys(require(process.env.ROOT + "/dist/index.js")).sort();
+assert.deepStrictEqual(Object.keys(l).sort(), expected, "packed exports differ from dist/index.js");
+for (const k of ["DANGEROUS_RULES","createRuleSet","overridableMatchedRuleIds","overridableRulesByIds","isCrossUserAccess","isSshCommand","matchesCronExpression","createMinuteCronJobFactory","createSessionIdentity","parseSessionKey","clampEffortToSupported","normalizeCatalogEntries"]) {
   assert(l[k] !== undefined, "missing export: " + k);
 }
 assert(l.DANGEROUS_RULES.length >= 14, "catalog too small");
 assert(l.isSshCommand("ssh host") === true, "isSshCommand broken");
-assert(l.matchRules("kill -9 1").some(r => r.id === "kill"), "matchRules broken");
+assert(l.createRuleSet(l.DANGEROUS_RULES).matchRules("kill -9 1").some(r => r.id === "kill"), "canonical matchRules broken");
 assert(l.overridableMatchedRuleIds("ssh host").length === 0, "lockdown isolation broken");
 const set = l.createRuleSet([{id:"x",label:"x",description:"x",sessionOverridable:false,match:(c)=>c.includes("boom")}]);
 assert(set.matchRules("boom")[0].id === "x", "createRuleSet broken");
@@ -37,11 +42,11 @@ console.log("node CJS require: OK");
 
 # 2. tsc type resolution under moduleResolution:node (soma-work's mode)
 cat > check.ts <<'EOF'
-import { DANGEROUS_RULES, createRuleSet, type DangerousRule, type DangerousRuleContext, type RuleSet, isCrossUserAccess, isSshCommand, matchRules, overridableMatchedRuleIds, overridableRulesByIds, rulesByIds } from 'soma-lib';
+import { DANGEROUS_RULES, createRuleSet, type DangerousRule, type DangerousRuleContext, type RuleSet, isCrossUserAccess, isSshCommand, overridableMatchedRuleIds, overridableRulesByIds } from 'soma-lib';
 const r: DangerousRule = DANGEROUS_RULES[0]!;
 const s: RuleSet = createRuleSet([r]);
 const ctx: DangerousRuleContext = { userId: 'U1' };
-void [s.matchRules('x', ctx), rulesByIds(['kill']), overridableMatchedRuleIds('x'), overridableRulesByIds(['kill']), isCrossUserAccess('x', 'U1'), isSshCommand('x'), matchRules('x')];
+void [s.matchRules('x', ctx), s.rulesByIds(['kill']), overridableMatchedRuleIds('x'), overridableRulesByIds(['kill']), isCrossUserAccess('x', 'U1'), isSshCommand('x')];
 EOF
 cat > tsconfig.json <<'EOF'
 { "compilerOptions": { "target": "ES2020", "module": "commonjs", "moduleResolution": "node", "strict": true, "noEmit": true }, "include": ["check.ts"] }

@@ -13,10 +13,9 @@
  * storage partition path) — with symmetric build/parse and invariant errors
  * carrying machine-readable codes.
  *
- * soma-work's current key is `channel-threadTs` (no tenant, different
- * separator, built ad hoc in SessionRegistry). Adopting this identity model
- * there requires migrating persisted session keys — a deliberate future step
- * recorded in the ROADMAP backlog, not smuggled in here.
+ * soma-work builds its `work:C:T` session keys with
+ * `buildSessionKeyFromInput` and reads them with `parseSessionKey` since its
+ * Step 4d key migration.
  *
  * Provenance: soma derives from Fabrizio Rinaldi's MIT claude-telegram-bot —
  * see the attribution note in LICENSE.
@@ -25,9 +24,6 @@
 const SESSION_KEY_SEPARATOR = ":";
 const STORAGE_PARTITION_SEPARATOR = "/";
 const DISALLOWED_IDENTITY_CHARS = /[:/\\]/;
-
-export const SESSION_KEY_FORMAT = "tenant:channel:thread";
-export const STORAGE_PARTITION_FORMAT = "tenant/channel/thread";
 
 declare const tenantIdBrand: unique symbol;
 declare const channelIdBrand: unique symbol;
@@ -162,12 +158,6 @@ export function buildStoragePartitionKey(
   return `${identity.tenantId}${STORAGE_PARTITION_SEPARATOR}${identity.channelId}${STORAGE_PARTITION_SEPARATOR}${identity.threadId}` as StoragePartitionKey;
 }
 
-export function buildStoragePartitionKeyFromInput(
-  input: SessionIdentityInput
-): StoragePartitionKey {
-  return buildStoragePartitionKey(createSessionIdentity(input));
-}
-
 export function parseStoragePartitionKey(storagePartitionKey: string): SessionIdentity {
   const [tenantId, channelId, threadId] = splitIdentityTriplet(
     storagePartitionKey,
@@ -177,19 +167,3 @@ export function parseStoragePartitionKey(storagePartitionKey: string): SessionId
   );
   return createSessionIdentity({ tenantId, channelId, threadId });
 }
-
-export interface SessionKeyContract {
-  createIdentity(input: SessionIdentityInput): SessionIdentity;
-  buildSessionKey(identity: SessionIdentity): SessionKey;
-  parseSessionKey(sessionKey: string): SessionIdentity;
-  buildStoragePartitionKey(identity: SessionIdentity): StoragePartitionKey;
-  parseStoragePartitionKey(storagePartitionKey: string): SessionIdentity;
-}
-
-export const sessionKeyContract: SessionKeyContract = {
-  createIdentity: createSessionIdentity,
-  buildSessionKey,
-  parseSessionKey,
-  buildStoragePartitionKey,
-  parseStoragePartitionKey,
-};

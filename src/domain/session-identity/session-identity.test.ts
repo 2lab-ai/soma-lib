@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   SessionIdentityInvariantError,
   buildSessionKeyFromInput,
-  buildStoragePartitionKeyFromInput,
+  buildStoragePartitionKey,
   createSessionIdentity,
   parseSessionKey,
   parseStoragePartitionKey,
@@ -32,11 +32,13 @@ describe("core session-key contract", () => {
   });
 
   test("builds tenant/channel/thread storage partition key", () => {
-    const storagePartitionKey = buildStoragePartitionKeyFromInput({
-      tenantId: "tenant-a",
-      channelId: "telegram-main",
-      threadId: "thread-42",
-    });
+    const storagePartitionKey = buildStoragePartitionKey(
+      createSessionIdentity({
+        tenantId: "tenant-a",
+        channelId: "telegram-main",
+        threadId: "thread-42",
+      })
+    );
 
     expect(storagePartitionKey as string).toBe("tenant-a/telegram-main/thread-42");
   });
@@ -53,6 +55,19 @@ describe("core session-key contract", () => {
 
     expect(error.code).toBe("SESSION_KEY_INVALID_FORMAT");
     expect(error.field).toBe("sessionKey");
+  });
+
+  test("rejects empty identity segments", () => {
+    const error = expectInvariantError(() =>
+      createSessionIdentity({
+        tenantId: " ",
+        channelId: "telegram-main",
+        threadId: "thread-42",
+      })
+    );
+
+    expect(error.code).toBe("IDENTITY_EMPTY");
+    expect(error.field).toBe("tenantId");
   });
 
   test("rejects identity segments with separators", () => {

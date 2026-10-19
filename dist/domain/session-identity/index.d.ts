@@ -13,16 +13,13 @@
  * storage partition path) — with symmetric build/parse and invariant errors
  * carrying machine-readable codes.
  *
- * soma-work's current key is `channel-threadTs` (no tenant, different
- * separator, built ad hoc in SessionRegistry). Adopting this identity model
- * there requires migrating persisted session keys — a deliberate future step
- * recorded in the ROADMAP backlog, not smuggled in here.
+ * soma-work builds its `work:C:T` session keys with
+ * `buildSessionKeyFromInput` and reads them with `parseSessionKey` since its
+ * Step 4d key migration.
  *
  * Provenance: soma derives from Fabrizio Rinaldi's MIT claude-telegram-bot —
  * see the attribution note in LICENSE.
  */
-export declare const SESSION_KEY_FORMAT = "tenant:channel:thread";
-export declare const STORAGE_PARTITION_FORMAT = "tenant/channel/thread";
 declare const tenantIdBrand: unique symbol;
 declare const channelIdBrand: unique symbol;
 declare const threadIdBrand: unique symbol;
@@ -70,14 +67,5 @@ export declare function buildSessionKey(identity: SessionIdentity): SessionKey;
 export declare function buildSessionKeyFromInput(input: SessionIdentityInput): SessionKey;
 export declare function parseSessionKey(sessionKey: string): SessionIdentity;
 export declare function buildStoragePartitionKey(identity: SessionIdentity): StoragePartitionKey;
-export declare function buildStoragePartitionKeyFromInput(input: SessionIdentityInput): StoragePartitionKey;
 export declare function parseStoragePartitionKey(storagePartitionKey: string): SessionIdentity;
-export interface SessionKeyContract {
-    createIdentity(input: SessionIdentityInput): SessionIdentity;
-    buildSessionKey(identity: SessionIdentity): SessionKey;
-    parseSessionKey(sessionKey: string): SessionIdentity;
-    buildStoragePartitionKey(identity: SessionIdentity): StoragePartitionKey;
-    parseStoragePartitionKey(storagePartitionKey: string): SessionIdentity;
-}
-export declare const sessionKeyContract: SessionKeyContract;
 export {};

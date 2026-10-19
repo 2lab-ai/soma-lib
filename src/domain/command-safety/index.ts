@@ -25,9 +25,10 @@
  *     out-of-process permission children — lockdown ids are silently filtered
  *     out so the child never sees them, even if a stale id sneaks into a
  *     button payload or a session disable set.
- *   - `matchRules` / `rulesByIds` operate over the full catalog. They are for
- *     parent-side callers that need the lockdown rules (audit logging,
- *     enforcement wiring). They are NOT what a permission child should call.
+ *   - Full-catalog matching (lockdown + overridable) is the `RuleSet` method
+ *     `createRuleSet(DANGEROUS_RULES).matchRules`. The flat `matchRules` /
+ *     `rulesByIds` exports were removed in 0.8.0: neither consumer ever called
+ *     them (soma-work's last `rulesByIds` caller went in #768).
  *   - `isCrossUserAccess` / `isSshCommand` are standalone matchers meant to be
  *     wired onto dedicated PreToolUse hooks, so an app's bypass state can
  *     never silence them.
@@ -211,7 +212,8 @@ export const EXECUTION_DISPATCH_RULES: ReadonlyArray<DangerousRule> = EXECUTION_
 
 /**
  * Canonical shared catalog. Declared once, consumed by:
- *   - the flat engine exports below (`matchRules`, `overridableMatchedRuleIds`, …)
+ *   - the flat overridable helpers below (`overridableMatchedRuleIds`,
+ *     `overridableRulesByIds`) and `createRuleSet(DANGEROUS_RULES)`
  *   - soma-work `bypassBashPermissionDecision` (overridable subset)
  *   - soma-work permission-mcp-server (overridable helpers → Slack buttons)
  */
@@ -336,26 +338,6 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
 ];
 
 const CANONICAL = createRuleSet(DANGEROUS_RULES);
-
-/**
- * Return every rule in the canonical catalog that matches `command`.
- * Both overridable and lockdown rules are returned — callers decide what to do.
- *
- * Parent-process callers that want lockdown enforcement should use this. A
- * permission child should NEVER call this — call `overridableMatchedRuleIds`.
- */
-export function matchRules(command: string, ctx: DangerousRuleContext = {}): DangerousRule[] {
-  return CANONICAL.matchRules(command, ctx);
-}
-
-/**
- * Look up rules by id over the FULL canonical catalog (lockdown + overridable).
- * Order preserved; unknown ids silently dropped. Parent-only — a permission
- * child must use `overridableRulesByIds` instead.
- */
-export function rulesByIds(ruleIds: ReadonlyArray<string>): DangerousRule[] {
-  return CANONICAL.rulesByIds(ruleIds);
-}
 
 /**
  * Returns the overridable canonical rule ids that match `command`
