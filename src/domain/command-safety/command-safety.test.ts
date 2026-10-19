@@ -365,6 +365,8 @@ describe('case-insensitive filesystems', () => {
     `cat /tmp/\\${OTHER}/file`,
     `cat /tmp/"${OTHER}"/file`,
     `cat '/tmp/${other}/file'`,
+    // the shorter (U + 8) Slack id length, lowercased
+    'ls /tmp/u0g9qf9c6/',
   ])('detects cross-user access: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
   });
@@ -385,6 +387,10 @@ describe('case-insensitive filesystems', () => {
     'ls /tmp/update20261019',
     'ls /tmp/unity2021',
     `echo "/tmp/" "u094e5l4a15"`,
+    // not one of Slack's two id lengths (U/W + 8 or 10)
+    'ls /tmp/u1234567',
+    'ls /tmp/u123456789',
+    'ls /tmp/u12345678901',
   ])('allows: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(false);
   });

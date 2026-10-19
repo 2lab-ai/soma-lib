@@ -304,13 +304,14 @@ const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/[^\s]*\.\./i;
 const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
 /**
  * A segment written with any lowercase letter is a user directory only when it
- * is Slack-id shaped: U/W, then a digit (Slack user ids are `U0…` / `W0…`),
- * then 7+ alphanumerics. A heuristic: it keeps ordinary lowercase directories
- * such as `/tmp/uploads2024`, `/tmp/workspace1` or `/tmp/ubuntu2204` ordinary
- * (this rule is a non-overridable deny). All-uppercase segments keep the
- * original, broader reading.
+ * is Slack-id shaped: U/W plus 8 or 10 alphanumerics (Slack's two id lengths),
+ * the first a digit (user ids are `U0…` / `W0…`). A heuristic: it keeps
+ * ordinary lowercase directories such as `/tmp/uploads2024`,
+ * `/tmp/workspace1` or `/tmp/ubuntu2204` ordinary (this rule is a
+ * non-overridable deny). All-uppercase segments keep the original, broader
+ * reading.
  */
-const SLACK_ID_SHAPE_RE = /^[UW]\d[A-Z0-9]{7,}$/;
+const SLACK_ID_SHAPE_RE = /^[UW]\d(?:[A-Z0-9]{7}|[A-Z0-9]{9})$/;
 /**
  * Shell quoting that leaves the path the same: `/tmp/\U0…`, `/tmp/"U0…"`,
  * `'/tmp/U0…'` all name the directory `/tmp/U0…`.
