@@ -317,3 +317,63 @@ describe('isCrossUserAccess', () => {
     expect(isCrossUserAccess(command, CURRENT_USER)).toBe(false);
   });
 });
+
+// macOS hosts run on case-insensitive APFS: `RM`, `KILL`, `SSH` resolve to the
+// real /bin/rm, /bin/kill, /usr/bin/ssh, and a lowercased `/tmp/<id>` IS that
+// user's directory. A case-sensitive matcher let every one of these run
+// unflagged (and, under bypass mode, auto-allowed).
+describe('case-insensitive filesystems', () => {
+  const ids = (cmd: string) => matchRules(cmd).map((r) => r.id);
+  const OTHER = 'U09F1M5MML1';
+  const other = OTHER.toLowerCase();
+
+  it.each([
+    ['KILL 1', ['kill']],
+    ['Kill -9 1', ['kill']],
+    ['PKILL node', ['pkill']],
+    ['KillAll python', ['killall']],
+    ['RM -rf /tmp/x', ['rm-recursive', 'rm-force']],
+    ['rm -R /tmp/x', ['rm-recursive']],
+    ['rm -Rv /tmp/x', ['rm-recursive']],
+    ['RM --FORCE x', ['rm-force-long']],
+    ['SHUTDOWN now', ['shutdown']],
+    ['Reboot', ['reboot']],
+    ['sudo HALT', ['halt']],
+    ['MKFS.ext4 /dev/sda1', ['mkfs']],
+    ['DD if=/dev/zero of=/dev/sda', ['dd-if']],
+    ['CHMOD -R 777 /tmp/x', ['chmod-world-recursive']],
+  ])('%s matches %j', (cmd, expected) => {
+    expect(ids(cmd)).toEqual(expected);
+  });
+
+  it.each(['SSH user@host ls', 'Scp f user@host:/tmp/', 'SFTP host', 'rsync -e SSH a host:b'])(
+    'detects ssh: %s',
+    (cmd) => {
+      expect(isSshCommand(cmd)).toBe(true);
+    },
+  );
+
+  it.each([
+    `cat /tmp/${other}/file.txt`,
+    `cat /TMP/${OTHER}/file.txt`,
+    `ls /Private/Tmp/${OTHER}/`,
+    `cat /tmp/U094E5L4A15/../${other}/file`,
+    `cat /TMP/U094E5L4A15/../${OTHER}/file`,
+    `cat /tmp//${OTHER}/file`,
+    `cat /tmp/./${OTHER}/file`,
+  ])('detects cross-user access: %s', (cmd) => {
+    expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
+  });
+
+  it.each([
+    'cat /tmp/u094e5l4a15/file.txt',
+    'cd /TMP/U094E5L4A15/session',
+    // lowercase directories that are not Slack-id shaped stay ordinary
+    'mkdir -p /tmp/uploads',
+    'ls /tmp/work/out',
+    'cat /tmp/webpack-stats.json',
+    'ls /tmp/uv-cache',
+  ])('allows: %s', (cmd) => {
+    expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(false);
+  });
+});

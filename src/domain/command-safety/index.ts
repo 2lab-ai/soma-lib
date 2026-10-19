@@ -224,21 +224,21 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'kill process',
     description: 'Sends a signal to a running process. Can terminate sibling sessions.',
     sessionOverridable: true,
-    match: (cmd) => /\bkill\b/.test(cmd),
+    match: (cmd) => /\bkill\b/i.test(cmd),
   },
   {
     id: 'pkill',
     label: 'pkill process',
     description: 'Pattern-based process killer.',
     sessionOverridable: true,
-    match: (cmd) => /\bpkill\b/.test(cmd),
+    match: (cmd) => /\bpkill\b/i.test(cmd),
   },
   {
     id: 'killall',
     label: 'killall process',
     description: 'Kills all processes matching a name.',
     sessionOverridable: true,
-    match: (cmd) => /\bkillall\b/.test(cmd),
+    match: (cmd) => /\bkillall\b/i.test(cmd),
   },
 
   // Destructive file operations
@@ -247,21 +247,21 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'recursive delete',
     description: 'rm with -r / -R / --recursive: recursively deletes a tree.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*\s|.*--recursive)/.test(cmd),
+    match: (cmd) => /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*\s|.*--recursive)/i.test(cmd),
   },
   {
     id: 'rm-force',
     label: 'force delete',
     description: 'rm -f: force-deletes without prompting.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+-[a-zA-Z]*f/.test(cmd),
+    match: (cmd) => /\brm\s+-[a-zA-Z]*f/i.test(cmd),
   },
   {
     id: 'rm-force-long',
     label: 'force delete (--force)',
     description: 'rm --force: same as -f.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+.*--force/.test(cmd),
+    match: (cmd) => /\brm\s+.*--force/i.test(cmd),
   },
 
   // System-level operations
@@ -270,28 +270,28 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'system shutdown',
     description: 'Powers down the host.',
     sessionOverridable: true,
-    match: (cmd) => /\bshutdown\b/.test(cmd),
+    match: (cmd) => /\bshutdown\b/i.test(cmd),
   },
   {
     id: 'reboot',
     label: 'system reboot',
     description: 'Reboots the host.',
     sessionOverridable: true,
-    match: (cmd) => /\breboot\b/.test(cmd),
+    match: (cmd) => /\breboot\b/i.test(cmd),
   },
   {
     id: 'halt',
     label: 'system halt',
     description: 'Halts the host.',
     sessionOverridable: true,
-    match: (cmd) => /\bhalt\b/.test(cmd),
+    match: (cmd) => /\bhalt\b/i.test(cmd),
   },
   {
     id: 'mkfs',
     label: 'format filesystem',
     description: 'Formats a block device — destroys data.',
     sessionOverridable: true,
-    match: (cmd) => /\bmkfs\b/.test(cmd),
+    match: (cmd) => /\bmkfs\b/i.test(cmd),
   },
 
   // Disk operations
@@ -300,7 +300,7 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'disk copy (dd)',
     description: 'dd if=...: raw block copy, can overwrite disks.',
     sessionOverridable: true,
-    match: (cmd) => /\bdd\s+if=/.test(cmd),
+    match: (cmd) => /\bdd\s+if=/i.test(cmd),
   },
 
   // Dangerous permission changes
@@ -309,7 +309,7 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'recursive world-writable chmod',
     description: 'chmod -R with world-writable bits.',
     sessionOverridable: true,
-    match: (cmd) => /\bchmod\s+(-[a-zA-Z]*R|--recursive)\s+[0-7]*7[0-7]*7/.test(cmd),
+    match: (cmd) => /\bchmod\s+(-[a-zA-Z]*R|--recursive)\s+[0-7]*7[0-7]*7/i.test(cmd),
   },
 
   // Execution-dispatch family — promoted from soma (Step 2, 2026-08-21).
@@ -370,8 +370,19 @@ export function overridableRulesByIds(ruleIds: ReadonlyArray<string>): Dangerous
 // `g` flag on TMP_USER_RE means call sites must use `matchAll` (fresh iterator
 // per call) instead of `.exec`-in-a-loop, which would carry `lastIndex` state
 // across concurrent callers.
-const TMP_TRAVERSAL_RE = /(?:\/private)?\/tmp\/[^\s]*\.\./;
-const TMP_USER_RE = /(?:\/private)?\/tmp\/([UW][A-Z0-9]+)\b/g;
+//
+// Case-insensitive, and tolerant of `//` and `./` segments: macOS hosts run on
+// case-insensitive APFS, where `/TMP/<id>` and a lowercased `<id>` resolve to
+// the same directory as `/tmp/<ID>`.
+const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/[^\s]*\.\./i;
+const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
+/**
+ * A segment written with any lowercase letter is a user directory only when it
+ * is Slack-id shaped (U/W, 8+ more alphanumerics, at least one digit), so that
+ * ordinary lowercase directories such as `/tmp/uploads` or `/tmp/work` stay
+ * ordinary. All-uppercase segments keep the original, broader reading.
+ */
+const SLACK_ID_SHAPE_RE = /^[UW](?=[A-Z]*\d)[A-Z0-9]{8,}$/;
 
 /**
  * Cross-user directory access detection.
@@ -395,8 +406,12 @@ export function isCrossUserAccess(command: string, currentUserId: string): boole
     return true;
   }
 
+  const current = currentUserId.toUpperCase();
   for (const match of command.matchAll(TMP_USER_RE)) {
-    if (match[1] !== currentUserId) {
+    const segment = match[1] ?? '';
+    const folded = segment.toUpperCase();
+    if (segment !== folded && !SLACK_ID_SHAPE_RE.test(folded)) continue;
+    if (folded !== current) {
       return true;
     }
   }
@@ -407,7 +422,7 @@ export function isCrossUserAccess(command: string, currentUserId: string): boole
  * SSH command patterns — matches `ssh`, `scp`, `sftp`, `rsync` over SSH.
  * These commands allow remote server access and must be restricted to admin users.
  */
-const SSH_PATTERNS: ReadonlyArray<RegExp> = [/\bssh\b/, /\bscp\b/, /\bsftp\b/, /\brsync\b.*\b-e\s+['"]?ssh/];
+const SSH_PATTERNS: ReadonlyArray<RegExp> = [/\bssh\b/i, /\bscp\b/i, /\bsftp\b/i, /\brsync\b.*\b-e\s+['"]?ssh/i];
 
 /**
  * Check if a bash command involves SSH (remote server access).
