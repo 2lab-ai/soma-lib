@@ -336,6 +336,11 @@ describe('case-insensitive filesystems', () => {
     ['rm -R /tmp/x', ['rm-recursive']],
     ['rm -Rv /tmp/x', ['rm-recursive']],
     ['RM --FORCE x', ['rm-force-long']],
+    // options split across groups (review): every group counts, not just the first
+    ['rm -v -r /tmp/x', ['rm-recursive']],
+    ['RM -v -R /tmp/project', ['rm-recursive']],
+    ['rm -i -f x', ['rm-force']],
+    ['rm --verbose -rf x', ['rm-recursive', 'rm-force']],
     ['SHUTDOWN now', ['shutdown']],
     ['Reboot', ['reboot']],
     ['sudo HALT', ['halt']],
@@ -367,6 +372,10 @@ describe('case-insensitive filesystems', () => {
     `cat '/tmp/${other}/file'`,
     // the shorter (U + 8) Slack id length, lowercased
     'ls /tmp/u0g9qf9c6/',
+    // a quoted path with a space still escapes through `..` (review)
+    `cat "/tmp/U094E5L4A15/my dir/../../${OTHER}/secret"`,
+    `cat '/tmp/U094E5L4A15/a b/../../${OTHER}/s'`,
+    `cat /tmp/U094E5L4A15/my\\ dir/../../${OTHER}/secret`,
   ])('detects cross-user access: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
   });
@@ -387,6 +396,8 @@ describe('case-insensitive filesystems', () => {
     'ls /tmp/update20261019',
     'ls /tmp/unity2021',
     `echo "/tmp/" "u094e5l4a15"`,
+    // own quoted path with a space, no traversal
+    'cat "/tmp/U094E5L4A15/my dir/file.txt"',
     // not one of Slack's two id lengths (U/W + 8 or 10)
     'ls /tmp/u1234567',
     'ls /tmp/u123456789',

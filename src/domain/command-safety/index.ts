@@ -247,14 +247,16 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'recursive delete',
     description: 'rm with -r / -R / --recursive: recursively deletes a tree.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*\s|.*--recursive)/i.test(cmd),
+    // Any option group of the same rm command counts (`rm -v -R x`), not only
+    // the first; `[^;&|\n]` keeps the scan inside that command.
+    match: (cmd) => /\brm\s(?:[^;&|\n]*\s)?-[a-z]*r[a-z]*\s|\brm\s+.*--recursive/i.test(cmd),
   },
   {
     id: 'rm-force',
     label: 'force delete',
     description: 'rm -f: force-deletes without prompting.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+-[a-zA-Z]*f/i.test(cmd),
+    match: (cmd) => /\brm\s(?:[^;&|\n]*\s)?-[a-z]*f/i.test(cmd),
   },
   {
     id: 'rm-force-long',
@@ -374,7 +376,9 @@ export function overridableRulesByIds(ruleIds: ReadonlyArray<string>): Dangerous
 // Case-insensitive, and tolerant of `//` and `./` segments: macOS hosts run on
 // case-insensitive APFS, where `/TMP/<id>` and a lowercased `<id>` resolve to
 // the same directory as `/tmp/<ID>`.
-const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/[^\s]*\.\./i;
+// Applied per shell word (see `shellWords`), so a quoted path containing a
+// space stays one word and its `..` is still seen.
+const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/.*\.\./i;
 const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
 /**
  * A segment written with any lowercase letter is a user directory only when it
@@ -386,11 +390,43 @@ const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
  * reading.
  */
 const SLACK_ID_SHAPE_RE = /^[UW]\d(?:[A-Z0-9]{7}|[A-Z0-9]{9})$/;
+
 /**
- * Shell quoting that leaves the path the same: `/tmp/\U0…`, `/tmp/"U0…"`,
- * `'/tmp/U0…'` all name the directory `/tmp/U0…`.
+ * Split a command into shell words the way the shell reads paths: single and
+ * double quotes group (and are removed), a backslash escapes the next
+ * character, unquoted whitespace separates. So `/tmp/\U0…`, `/tmp/"U0…"` and
+ * `"/tmp/me/my dir/../../U0…"` each come out as the one path the shell sees.
+ * Not a full shell parser: no expansion, no operators.
  */
-const SHELL_QUOTING_RE = /["'\\]/g;
+function shellWords(command: string): string[] {
+  const words: string[] = [];
+  let word = '';
+  let inWord = false;
+  let quote: string | null = null;
+  for (let i = 0; i < command.length; i++) {
+    const ch = command.charAt(i);
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+      else if (ch === '\\' && quote === '"' && i + 1 < command.length) word += command.charAt(++i);
+      else word += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      inWord = true;
+    } else if (ch === '\\' && i + 1 < command.length) {
+      word += command.charAt(++i);
+      inWord = true;
+    } else if (/\s/.test(ch)) {
+      if (inWord) words.push(word);
+      word = '';
+      inWord = false;
+    } else {
+      word += ch;
+      inWord = true;
+    }
+  }
+  if (inWord) words.push(word);
+  return words;
+}
 
 /**
  * Cross-user directory access detection.
@@ -408,20 +444,20 @@ const SHELL_QUOTING_RE = /["'\\]/g;
  *   hook in the consuming app, independent of bypass state.
  */
 export function isCrossUserAccess(command: string, currentUserId: string): boolean {
-  const unquoted = command.replace(SHELL_QUOTING_RE, '');
-  // Reject any /tmp/ path containing traversal segments — prevents escaping
-  // own directory via /tmp/U094E5L4A15/../U09F1M5MML1/
-  if (TMP_TRAVERSAL_RE.test(unquoted)) {
-    return true;
-  }
-
   const current = currentUserId.toUpperCase();
-  for (const match of unquoted.matchAll(TMP_USER_RE)) {
-    const segment = match[1] ?? '';
-    const folded = segment.toUpperCase();
-    if (segment !== folded && !SLACK_ID_SHAPE_RE.test(folded)) continue;
-    if (folded !== current) {
+  for (const word of shellWords(command)) {
+    // Reject any /tmp/ path containing traversal segments — prevents escaping
+    // own directory via /tmp/U094E5L4A15/../U09F1M5MML1/
+    if (TMP_TRAVERSAL_RE.test(word)) {
       return true;
+    }
+    for (const match of word.matchAll(TMP_USER_RE)) {
+      const segment = match[1] ?? '';
+      const folded = segment.toUpperCase();
+      if (segment !== folded && !SLACK_ID_SHAPE_RE.test(folded)) continue;
+      if (folded !== current) {
+        return true;
+      }
     }
   }
   return false;
