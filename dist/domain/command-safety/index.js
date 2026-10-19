@@ -184,7 +184,8 @@ exports.DANGEROUS_RULES = [
         sessionOverridable: true,
         // Any option group of the same rm command counts (`rm -v -R x`), not only
         // the first; `[^;&|\n]` keeps the scan inside that command.
-        match: (cmd) => /\brm\s(?:[^;&|\n]*\s)?-[a-z]*r[a-z]*\s|\brm\s+.*--recursive/i.test(cmd),
+        // GNU rm permutes, so a group after the operands counts too (`rm x -r`).
+        match: (cmd) => /\brm\s(?:[^;&|\n]*\s)?-[a-z]*r[a-z]*(?=\s|$|[;&|])|\brm\s+.*--recursive/i.test(cmd),
     },
     {
         id: 'rm-force',
@@ -304,7 +305,8 @@ function overridableRulesByIds(ruleIds) {
 // the same directory as `/tmp/<ID>`.
 // Applied per shell word (see `shellWords`), so a quoted path containing a
 // space stays one word and its `..` is still seen.
-const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/.*\.\./i;
+// `[\s\S]` rather than `.`: a quoted newline or CR is part of the path.
+const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/[\s\S]*\.\./i;
 const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
 /**
  * A segment written with any lowercase letter is a user directory only when it
@@ -319,8 +321,9 @@ const SLACK_ID_SHAPE_RE = /^[UW]\d(?:[A-Z0-9]{7}|[A-Z0-9]{9})$/;
 /**
  * Split a command into shell words the way the shell reads paths: single and
  * double quotes group (and are removed), a backslash escapes the next
- * character, unquoted whitespace separates. So `/tmp/\U0…`, `/tmp/"U0…"` and
- * `"/tmp/me/my dir/../../U0…"` each come out as the one path the shell sees.
+ * character, unquoted space, tab or newline separates (bash's default IFS).
+ * So `/tmp/\U0…`, `/tmp/"U0…"` and `"/tmp/me/my dir/../../U0…"` each come
+ * out as the one path the shell sees.
  * Not a full shell parser: no expansion, no operators.
  */
 function shellWords(command) {
@@ -346,7 +349,8 @@ function shellWords(command) {
             word += command.charAt(++i);
             inWord = true;
         }
-        else if (/\s/.test(ch)) {
+        else if (ch === ' ' || ch === '\t' || ch === '\n') {
+            // bash's default IFS only; NBSP, U+2028 etc. are part of the word
             if (inWord)
                 words.push(word);
             word = '';

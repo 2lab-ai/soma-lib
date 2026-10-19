@@ -341,6 +341,9 @@ describe('case-insensitive filesystems', () => {
     ['RM -v -R /tmp/project', ['rm-recursive']],
     ['rm -i -f x', ['rm-force']],
     ['rm --verbose -rf x', ['rm-recursive', 'rm-force']],
+    // GNU rm permutes: an option group after the operands, at end of command
+    ['rm x -r', ['rm-recursive']],
+    ['rm x -R; ls', ['rm-recursive']],
     ['SHUTDOWN now', ['shutdown']],
     ['Reboot', ['reboot']],
     ['sudo HALT', ['halt']],
@@ -376,6 +379,11 @@ describe('case-insensitive filesystems', () => {
     `cat "/tmp/U094E5L4A15/my dir/../../${OTHER}/secret"`,
     `cat '/tmp/U094E5L4A15/a b/../../${OTHER}/s'`,
     `cat /tmp/U094E5L4A15/my\\ dir/../../${OTHER}/secret`,
+    // line terminators inside quotes, and characters bash does not split on
+    `cd "/tmp/U094E5L4A15/a\nb/../../${OTHER}" && cat secret`,
+    `cat "/tmp/U094E5L4A15/a\rb/../../${OTHER}/s"`,
+    `cd /tmp/U094E5L4A15/a /../../${OTHER} && cat secret`,
+    `cat /tmp/U094E5L4A15/a /../../${OTHER}/s`,
   ])('detects cross-user access: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
   });
