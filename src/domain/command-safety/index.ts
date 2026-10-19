@@ -378,11 +378,18 @@ const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/[^\s]*\.\./i;
 const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
 /**
  * A segment written with any lowercase letter is a user directory only when it
- * is Slack-id shaped (U/W, 8+ more alphanumerics, at least one digit), so that
- * ordinary lowercase directories such as `/tmp/uploads` or `/tmp/work` stay
- * ordinary. All-uppercase segments keep the original, broader reading.
+ * is Slack-id shaped: U/W, then a digit (Slack user ids are `U0…` / `W0…`),
+ * then 7+ alphanumerics. A heuristic: it keeps ordinary lowercase directories
+ * such as `/tmp/uploads2024`, `/tmp/workspace1` or `/tmp/ubuntu2204` ordinary
+ * (this rule is a non-overridable deny). All-uppercase segments keep the
+ * original, broader reading.
  */
-const SLACK_ID_SHAPE_RE = /^[UW](?=[A-Z]*\d)[A-Z0-9]{8,}$/;
+const SLACK_ID_SHAPE_RE = /^[UW]\d[A-Z0-9]{7,}$/;
+/**
+ * Shell quoting that leaves the path the same: `/tmp/\U0…`, `/tmp/"U0…"`,
+ * `'/tmp/U0…'` all name the directory `/tmp/U0…`.
+ */
+const SHELL_QUOTING_RE = /["'\\]/g;
 
 /**
  * Cross-user directory access detection.
@@ -400,14 +407,15 @@ const SLACK_ID_SHAPE_RE = /^[UW](?=[A-Z]*\d)[A-Z0-9]{8,}$/;
  *   hook in the consuming app, independent of bypass state.
  */
 export function isCrossUserAccess(command: string, currentUserId: string): boolean {
+  const unquoted = command.replace(SHELL_QUOTING_RE, '');
   // Reject any /tmp/ path containing traversal segments — prevents escaping
   // own directory via /tmp/U094E5L4A15/../U09F1M5MML1/
-  if (TMP_TRAVERSAL_RE.test(command)) {
+  if (TMP_TRAVERSAL_RE.test(unquoted)) {
     return true;
   }
 
   const current = currentUserId.toUpperCase();
-  for (const match of command.matchAll(TMP_USER_RE)) {
+  for (const match of unquoted.matchAll(TMP_USER_RE)) {
     const segment = match[1] ?? '';
     const folded = segment.toUpperCase();
     if (segment !== folded && !SLACK_ID_SHAPE_RE.test(folded)) continue;

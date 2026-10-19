@@ -361,6 +361,10 @@ describe('case-insensitive filesystems', () => {
     `cat /TMP/U094E5L4A15/../${OTHER}/file`,
     `cat /tmp//${OTHER}/file`,
     `cat /tmp/./${OTHER}/file`,
+    // shell quoting that names the same directory
+    `cat /tmp/\\${OTHER}/file`,
+    `cat /tmp/"${OTHER}"/file`,
+    `cat '/tmp/${other}/file'`,
   ])('detects cross-user access: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
   });
@@ -373,6 +377,14 @@ describe('case-insensitive filesystems', () => {
     'ls /tmp/work/out',
     'cat /tmp/webpack-stats.json',
     'ls /tmp/uv-cache',
+    // word-like lowercase names with digits are not Slack ids (cross-user is a hard deny)
+    'ls /tmp/workspace1',
+    'mkdir /tmp/uploads2024',
+    'ls /tmp/ubuntu2204',
+    'cat /tmp/webpack1234/x',
+    'ls /tmp/update20261019',
+    'ls /tmp/unity2021',
+    `echo "/tmp/" "u094e5l4a15"`,
   ])('allows: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(false);
   });
