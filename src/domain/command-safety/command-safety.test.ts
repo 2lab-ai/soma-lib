@@ -350,6 +350,8 @@ describe('case-insensitive filesystems', () => {
     ['MKFS.ext4 /dev/sda1', ['mkfs']],
     ['DD if=/dev/zero of=/dev/sda', ['dd-if']],
     ['CHMOD -R 777 /tmp/x', ['chmod-world-recursive']],
+    ['chmod -v -R 777 /tmp/x', ['chmod-world-recursive']],
+    ['chmod -R -v 0777 /tmp/x', ['chmod-world-recursive']],
   ])('%s matches %j', (cmd, expected) => {
     expect(ids(cmd)).toEqual(expected);
   });
@@ -384,6 +386,10 @@ describe('case-insensitive filesystems', () => {
     `cat "/tmp/U094E5L4A15/a\rb/../../${OTHER}/s"`,
     `cd /tmp/U094E5L4A15/a /../../${OTHER} && cat secret`,
     `cat /tmp/U094E5L4A15/a /../../${OTHER}/s`,
+    // a nested shell script is one outer word; its inner quotes still name the path
+    `bash -c 'cat /tmp/"${OTHER}"/secret'`,
+    `sh -c "ls /tmp/'${other}'/"`,
+    `cat /tmp/../${OTHER}/s`,
   ])('detects cross-user access: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
   });
@@ -406,6 +412,10 @@ describe('case-insensitive filesystems', () => {
     `echo "/tmp/" "u094e5l4a15"`,
     // own quoted path with a space, no traversal
     'cat "/tmp/U094E5L4A15/my dir/file.txt"',
+    // `..` that is not a path segment (a git range) inside a nested script
+    `bash -c 'git -C /tmp/U094E5L4A15/repo diff main..HEAD'`,
+    'git -C /tmp/U094E5L4A15/repo log origin/main..HEAD',
+    'cat /tmp/U094E5L4A15/notes..txt',
     // not one of Slack's two id lengths (U/W + 8 or 10)
     'ls /tmp/u1234567',
     'ls /tmp/u123456789',

@@ -312,7 +312,8 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'recursive world-writable chmod',
     description: 'chmod -R with world-writable bits.',
     sessionOverridable: true,
-    match: (cmd) => /\bchmod\s+(-[a-zA-Z]*R|--recursive)\s+[0-7]*7[0-7]*7/i.test(cmd),
+    // Other option groups may come before or after the recursive one.
+    match: (cmd) => /\bchmod\s+(?:-\S+\s+)*?(?:-[a-z]*R[a-z]*|--recursive)\s+(?:-\S+\s+)*[0-7]*7[0-7]*7/i.test(cmd),
   },
 
   // Execution-dispatch family — promoted from soma (Step 2, 2026-08-21).
@@ -379,8 +380,12 @@ export function overridableRulesByIds(ruleIds: ReadonlyArray<string>): Dangerous
 // the same directory as `/tmp/<ID>`.
 // Applied per shell word (see `shellWords`), so a quoted path containing a
 // space stays one word and its `..` is still seen.
-// `[\s\S]` rather than `.`: a quoted newline or CR is part of the path.
-const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp\/[\s\S]*\.\./i;
+// `..` only as a path segment (`/..` then `/`, end, whitespace or a quote), so a
+// git range such as `main..HEAD` in a nested `bash -c '…'` word is not
+// traversal. `[\s\S]` rather than `.`: a quoted newline or CR is part of the path.
+const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp(?:\/[\s\S]*)?\/\.\.(?=[/\s"']|$)/i;
+/** Quoting left inside a word, e.g. the inner quotes of a `bash -c '…'` script. */
+const RESIDUAL_QUOTING_RE = /["'\\]/g;
 const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
 /**
  * A segment written with any lowercase letter is a user directory only when it
@@ -449,7 +454,14 @@ function shellWords(command: string): string[] {
  */
 export function isCrossUserAccess(command: string, currentUserId: string): boolean {
   const current = currentUserId.toUpperCase();
+  const words = new Set<string>();
   for (const word of shellWords(command)) {
+    words.add(word);
+    // A nested script (`bash -c '…'`) is one word that still carries its own
+    // quoting; the inner shell reads the path without it.
+    words.add(word.replace(RESIDUAL_QUOTING_RE, ''));
+  }
+  for (const word of words) {
     // Reject any /tmp/ path containing traversal segments — prevents escaping
     // own directory via /tmp/U094E5L4A15/../U09F1M5MML1/
     if (TMP_TRAVERSAL_RE.test(word)) {
