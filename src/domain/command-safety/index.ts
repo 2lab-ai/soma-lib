@@ -224,21 +224,21 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'kill process',
     description: 'Sends a signal to a running process. Can terminate sibling sessions.',
     sessionOverridable: true,
-    match: (cmd) => /\bkill\b/.test(cmd),
+    match: (cmd) => /\bkill\b/i.test(cmd),
   },
   {
     id: 'pkill',
     label: 'pkill process',
     description: 'Pattern-based process killer.',
     sessionOverridable: true,
-    match: (cmd) => /\bpkill\b/.test(cmd),
+    match: (cmd) => /\bpkill\b/i.test(cmd),
   },
   {
     id: 'killall',
     label: 'killall process',
     description: 'Kills all processes matching a name.',
     sessionOverridable: true,
-    match: (cmd) => /\bkillall\b/.test(cmd),
+    match: (cmd) => /\bkillall\b/i.test(cmd),
   },
 
   // Destructive file operations
@@ -247,21 +247,24 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'recursive delete',
     description: 'rm with -r / -R / --recursive: recursively deletes a tree.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*\s|.*--recursive)/.test(cmd),
+    // Any option group of the same rm command counts (`rm -v -R x`), not only
+    // the first; `[^;&|\n]` keeps the scan inside that command.
+    // GNU rm permutes, so a group after the operands counts too (`rm x -r`).
+    match: (cmd) => /\brm\s(?:[^;&|\n]*\s)?-[a-z]*r[a-z]*(?=\s|$|[;&|])|\brm\s+.*--recursive/i.test(cmd),
   },
   {
     id: 'rm-force',
     label: 'force delete',
     description: 'rm -f: force-deletes without prompting.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+-[a-zA-Z]*f/.test(cmd),
+    match: (cmd) => /\brm\s(?:[^;&|\n]*\s)?-[a-z]*f/i.test(cmd),
   },
   {
     id: 'rm-force-long',
     label: 'force delete (--force)',
     description: 'rm --force: same as -f.',
     sessionOverridable: true,
-    match: (cmd) => /\brm\s+.*--force/.test(cmd),
+    match: (cmd) => /\brm\s+.*--force/i.test(cmd),
   },
 
   // System-level operations
@@ -270,28 +273,28 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'system shutdown',
     description: 'Powers down the host.',
     sessionOverridable: true,
-    match: (cmd) => /\bshutdown\b/.test(cmd),
+    match: (cmd) => /\bshutdown\b/i.test(cmd),
   },
   {
     id: 'reboot',
     label: 'system reboot',
     description: 'Reboots the host.',
     sessionOverridable: true,
-    match: (cmd) => /\breboot\b/.test(cmd),
+    match: (cmd) => /\breboot\b/i.test(cmd),
   },
   {
     id: 'halt',
     label: 'system halt',
     description: 'Halts the host.',
     sessionOverridable: true,
-    match: (cmd) => /\bhalt\b/.test(cmd),
+    match: (cmd) => /\bhalt\b/i.test(cmd),
   },
   {
     id: 'mkfs',
     label: 'format filesystem',
     description: 'Formats a block device — destroys data.',
     sessionOverridable: true,
-    match: (cmd) => /\bmkfs\b/.test(cmd),
+    match: (cmd) => /\bmkfs\b/i.test(cmd),
   },
 
   // Disk operations
@@ -300,7 +303,7 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'disk copy (dd)',
     description: 'dd if=...: raw block copy, can overwrite disks.',
     sessionOverridable: true,
-    match: (cmd) => /\bdd\s+if=/.test(cmd),
+    match: (cmd) => /\bdd\s+if=/i.test(cmd),
   },
 
   // Dangerous permission changes
@@ -309,7 +312,8 @@ export const DANGEROUS_RULES: ReadonlyArray<DangerousRule> = [
     label: 'recursive world-writable chmod',
     description: 'chmod -R with world-writable bits.',
     sessionOverridable: true,
-    match: (cmd) => /\bchmod\s+(-[a-zA-Z]*R|--recursive)\s+[0-7]*7[0-7]*7/.test(cmd),
+    // Other option groups may come before or after the recursive one.
+    match: (cmd) => /\bchmod\s+(?:-\S+\s+)*?(?:-[a-z]*R[a-z]*|--recursive)\s+(?:-\S+\s+)*[0-7]*7[0-7]*7/i.test(cmd),
   },
 
   // Execution-dispatch family — promoted from soma (Step 2, 2026-08-21).
@@ -370,8 +374,72 @@ export function overridableRulesByIds(ruleIds: ReadonlyArray<string>): Dangerous
 // `g` flag on TMP_USER_RE means call sites must use `matchAll` (fresh iterator
 // per call) instead of `.exec`-in-a-loop, which would carry `lastIndex` state
 // across concurrent callers.
-const TMP_TRAVERSAL_RE = /(?:\/private)?\/tmp\/[^\s]*\.\./;
-const TMP_USER_RE = /(?:\/private)?\/tmp\/([UW][A-Z0-9]+)\b/g;
+//
+// Case-insensitive, and tolerant of `//` and `./` segments: macOS hosts run on
+// case-insensitive APFS, where `/TMP/<id>` and a lowercased `<id>` resolve to
+// the same directory as `/tmp/<ID>`.
+// Applied per shell word (see `shellWords`), so a quoted path containing a
+// space stays one word and its `..` is still seen.
+// `..` as a path component, not as part of a name: not preceded by a filename
+// character, whitespace or a quote, and not followed by a filename character.
+// So `/..`, `..;`, `{x,..}`, `;../`, `<../`, `$(../`, `$'..'`, `${x:-..}` count,
+// while a git range such as `main..HEAD`, `notes..txt`, and a bare `cd ..` or a
+// quoted `".."` inside a nested `bash -c '…'` word do not. (Quotes add nothing
+// here: every word is also checked with its residual quoting stripped.)
+// `[\s\S]` rather than `.`: a quoted newline or CR is part of the path.
+const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp(?:\/[\s\S]*)?(?<![\w.\s"'])\.\.(?![\w.-])/i;
+/** Quoting left inside a word, e.g. the inner quotes of a `bash -c '…'` script. */
+const RESIDUAL_QUOTING_RE = /["'\\]/g;
+const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
+/**
+ * A segment written with any lowercase letter is a user directory only when it
+ * is Slack-id shaped: U/W plus 8 or 10 alphanumerics (Slack's two id lengths),
+ * the first a digit (user ids are `U0…` / `W0…`). A heuristic: it keeps
+ * ordinary lowercase directories such as `/tmp/uploads2024`,
+ * `/tmp/workspace1` or `/tmp/ubuntu2204` ordinary (this rule is a
+ * non-overridable deny). All-uppercase segments keep the original, broader
+ * reading.
+ */
+const SLACK_ID_SHAPE_RE = /^[UW]\d(?:[A-Z0-9]{7}|[A-Z0-9]{9})$/;
+
+/**
+ * Split a command into shell words the way the shell reads paths: single and
+ * double quotes group (and are removed), a backslash escapes the next
+ * character, unquoted space, tab or newline separates (bash's default IFS).
+ * So `/tmp/\U0…`, `/tmp/"U0…"` and `"/tmp/me/my dir/../../U0…"` each come
+ * out as the one path the shell sees.
+ * Not a full shell parser: no expansion, no operators.
+ */
+function shellWords(command: string): string[] {
+  const words: string[] = [];
+  let word = '';
+  let inWord = false;
+  let quote: string | null = null;
+  for (let i = 0; i < command.length; i++) {
+    const ch = command.charAt(i);
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+      else if (ch === '\\' && quote === '"' && i + 1 < command.length) word += command.charAt(++i);
+      else word += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      inWord = true;
+    } else if (ch === '\\' && i + 1 < command.length) {
+      word += command.charAt(++i);
+      inWord = true;
+    } else if (ch === ' ' || ch === '\t' || ch === '\n') {
+      // bash's default IFS only; NBSP, U+2028 etc. are part of the word
+      if (inWord) words.push(word);
+      word = '';
+      inWord = false;
+    } else {
+      word += ch;
+      inWord = true;
+    }
+  }
+  if (inWord) words.push(word);
+  return words;
+}
 
 /**
  * Cross-user directory access detection.
@@ -389,15 +457,27 @@ const TMP_USER_RE = /(?:\/private)?\/tmp\/([UW][A-Z0-9]+)\b/g;
  *   hook in the consuming app, independent of bypass state.
  */
 export function isCrossUserAccess(command: string, currentUserId: string): boolean {
-  // Reject any /tmp/ path containing traversal segments — prevents escaping
-  // own directory via /tmp/U094E5L4A15/../U09F1M5MML1/
-  if (TMP_TRAVERSAL_RE.test(command)) {
-    return true;
+  const current = currentUserId.toUpperCase();
+  const words = new Set<string>();
+  for (const word of shellWords(command)) {
+    words.add(word);
+    // A nested script (`bash -c '…'`) is one word that still carries its own
+    // quoting; the inner shell reads the path without it.
+    words.add(word.replace(RESIDUAL_QUOTING_RE, ''));
   }
-
-  for (const match of command.matchAll(TMP_USER_RE)) {
-    if (match[1] !== currentUserId) {
+  for (const word of words) {
+    // Reject any /tmp/ path containing traversal segments — prevents escaping
+    // own directory via /tmp/U094E5L4A15/../U09F1M5MML1/
+    if (TMP_TRAVERSAL_RE.test(word)) {
       return true;
+    }
+    for (const match of word.matchAll(TMP_USER_RE)) {
+      const segment = match[1] ?? '';
+      const folded = segment.toUpperCase();
+      if (segment !== folded && !SLACK_ID_SHAPE_RE.test(folded)) continue;
+      if (folded !== current) {
+        return true;
+      }
     }
   }
   return false;
@@ -407,7 +487,7 @@ export function isCrossUserAccess(command: string, currentUserId: string): boole
  * SSH command patterns — matches `ssh`, `scp`, `sftp`, `rsync` over SSH.
  * These commands allow remote server access and must be restricted to admin users.
  */
-const SSH_PATTERNS: ReadonlyArray<RegExp> = [/\bssh\b/, /\bscp\b/, /\bsftp\b/, /\brsync\b.*\b-e\s+['"]?ssh/];
+const SSH_PATTERNS: ReadonlyArray<RegExp> = [/\bssh\b/i, /\bscp\b/i, /\bsftp\b/i, /\brsync\b.*\b-e\s+['"]?ssh/i];
 
 /**
  * Check if a bash command involves SSH (remote server access).

@@ -317,3 +317,136 @@ describe('isCrossUserAccess', () => {
     expect(isCrossUserAccess(command, CURRENT_USER)).toBe(false);
   });
 });
+
+// macOS hosts run on case-insensitive APFS: `RM`, `KILL`, `SSH` resolve to the
+// real /bin/rm, /bin/kill, /usr/bin/ssh, and a lowercased `/tmp/<id>` IS that
+// user's directory. A case-sensitive matcher let every one of these run
+// unflagged (and, under bypass mode, auto-allowed).
+describe('case-insensitive filesystems', () => {
+  const ids = (cmd: string) => matchRules(cmd).map((r) => r.id);
+  const OTHER = 'U09F1M5MML1';
+  const other = OTHER.toLowerCase();
+
+  it.each([
+    ['KILL 1', ['kill']],
+    ['Kill -9 1', ['kill']],
+    ['PKILL node', ['pkill']],
+    ['KillAll python', ['killall']],
+    ['RM -rf /tmp/x', ['rm-recursive', 'rm-force']],
+    ['rm -R /tmp/x', ['rm-recursive']],
+    ['rm -Rv /tmp/x', ['rm-recursive']],
+    ['RM --FORCE x', ['rm-force-long']],
+    // options split across groups (review): every group counts, not just the first
+    ['rm -v -r /tmp/x', ['rm-recursive']],
+    ['RM -v -R /tmp/project', ['rm-recursive']],
+    ['rm -i -f x', ['rm-force']],
+    ['rm --verbose -rf x', ['rm-recursive', 'rm-force']],
+    // GNU rm permutes: an option group after the operands, at end of command
+    ['rm x -r', ['rm-recursive']],
+    ['rm x -R; ls', ['rm-recursive']],
+    ['SHUTDOWN now', ['shutdown']],
+    ['Reboot', ['reboot']],
+    ['sudo HALT', ['halt']],
+    ['MKFS.ext4 /dev/sda1', ['mkfs']],
+    ['DD if=/dev/zero of=/dev/sda', ['dd-if']],
+    ['CHMOD -R 777 /tmp/x', ['chmod-world-recursive']],
+    ['chmod -v -R 777 /tmp/x', ['chmod-world-recursive']],
+    ['chmod -R -v 0777 /tmp/x', ['chmod-world-recursive']],
+  ])('%s matches %j', (cmd, expected) => {
+    expect(ids(cmd)).toEqual(expected);
+  });
+
+  it.each(['SSH user@host ls', 'Scp f user@host:/tmp/', 'SFTP host', 'rsync -e SSH a host:b'])(
+    'detects ssh: %s',
+    (cmd) => {
+      expect(isSshCommand(cmd)).toBe(true);
+    },
+  );
+
+  it.each([
+    `cat /tmp/${other}/file.txt`,
+    `cat /TMP/${OTHER}/file.txt`,
+    `ls /Private/Tmp/${OTHER}/`,
+    `cat /tmp/U094E5L4A15/../${other}/file`,
+    `cat /TMP/U094E5L4A15/../${OTHER}/file`,
+    `cat /tmp//${OTHER}/file`,
+    `cat /tmp/./${OTHER}/file`,
+    // shell quoting that names the same directory
+    `cat /tmp/\\${OTHER}/file`,
+    `cat /tmp/"${OTHER}"/file`,
+    `cat '/tmp/${other}/file'`,
+    // the shorter (U + 8) Slack id length, lowercased
+    'ls /tmp/u0g9qf9c6/',
+    // a quoted path with a space still escapes through `..` (review)
+    `cat "/tmp/U094E5L4A15/my dir/../../${OTHER}/secret"`,
+    `cat '/tmp/U094E5L4A15/a b/../../${OTHER}/s'`,
+    `cat /tmp/U094E5L4A15/my\\ dir/../../${OTHER}/secret`,
+    // line terminators inside quotes, and characters bash does not split on
+    `cd "/tmp/U094E5L4A15/a\nb/../../${OTHER}" && cat secret`,
+    `cat "/tmp/U094E5L4A15/a\rb/../../${OTHER}/s"`,
+    `cd /tmp/U094E5L4A15/a /../../${OTHER} && cat secret`,
+    `cat /tmp/U094E5L4A15/a /../../${OTHER}/s`,
+    // a nested shell script is one outer word; its inner quotes still name the path
+    `bash -c 'cat /tmp/"${OTHER}"/secret'`,
+    `sh -c "ls /tmp/'${other}'/"`,
+    `cat /tmp/../${OTHER}/s`,
+    // `..` ended by a shell metacharacter or produced by an expansion (final review)
+    `cd /tmp/U094E5L4A15/..;cat ${OTHER}/secret`,
+    `cd /tmp/U094E5L4A15/..&&cat ${OTHER}/secret`,
+    `bash -c 'cd /tmp/U094E5L4A15/..;cat ${OTHER}/secret'`,
+    `cat /tmp/U094E5L4A15/..$'/'${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/$'..'/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/\${x:-..}/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/..{,}/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/..*/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/..$(echo /)${OTHER}/secret`,
+    // `..` preceded by a shell separator, brace comma or redirect (final review 2)
+    `cat /tmp/U094E5L4A15/{x,..}/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/{,..}/${OTHER}/secret`,
+    `bash -c 'cd /tmp/U094E5L4A15;cat<../${OTHER}/secret'`,
+    `bash -c 'cd /tmp/U094E5L4A15&&cat<../${OTHER}/secret'`,
+    `bash -c 'cd /tmp/U094E5L4A15;../${OTHER}/run.sh'`,
+    `bash -c 'cd /tmp/U094E5L4A15&&../${OTHER}/run.sh'`,
+    `bash -c 'cd /tmp/U094E5L4A15;echo|../${OTHER}/run.sh'`,
+    `bash -c 'cd /tmp/U094E5L4A15;x=$(../${OTHER}/run.sh)'`,
+    `bash -c 'cd /tmp/U094E5L4A15;(../${OTHER}/run.sh)'`,
+    `bash -c 'cd /tmp/U094E5L4A15;x=\`../${OTHER}/run.sh\`'`,
+    `bash -c 'cd /tmp/U094E5L4A15;x=$(<../${OTHER}/secret)'`,
+  ])('detects cross-user access: %s', (cmd) => {
+    expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
+  });
+
+  it.each([
+    'cat /tmp/u094e5l4a15/file.txt',
+    'cd /TMP/U094E5L4A15/session',
+    // lowercase directories that are not Slack-id shaped stay ordinary
+    'mkdir -p /tmp/uploads',
+    'ls /tmp/work/out',
+    'cat /tmp/webpack-stats.json',
+    'ls /tmp/uv-cache',
+    // word-like lowercase names with digits are not Slack ids (cross-user is a hard deny)
+    'ls /tmp/workspace1',
+    'mkdir /tmp/uploads2024',
+    'ls /tmp/ubuntu2204',
+    'cat /tmp/webpack1234/x',
+    'ls /tmp/update20261019',
+    'ls /tmp/unity2021',
+    `echo "/tmp/" "u094e5l4a15"`,
+    // own quoted path with a space, no traversal
+    'cat "/tmp/U094E5L4A15/my dir/file.txt"',
+    // `..` that is not a path segment (a git range) inside a nested script
+    `bash -c 'git -C /tmp/U094E5L4A15/repo diff main..HEAD'`,
+    'git -C /tmp/U094E5L4A15/repo log origin/main..HEAD',
+    'cat /tmp/U094E5L4A15/notes..txt',
+    // inside a nested script: a bare `cd ..` / `cmake ..` and quoted `..` text
+    `bash -c 'cd /tmp/U094E5L4A15/proj && cd ..'`,
+    `bash -c 'cd /tmp/U094E5L4A15/build && cmake ..'`,
+    `bash -c 'cd /tmp/U094E5L4A15 && grep ".." notes'`,
+    // not one of Slack's two id lengths (U/W + 8 or 10)
+    'ls /tmp/u1234567',
+    'ls /tmp/u123456789',
+    'ls /tmp/u12345678901',
+  ])('allows: %s', (cmd) => {
+    expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(false);
+  });
+});
