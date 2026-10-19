@@ -390,6 +390,16 @@ describe('case-insensitive filesystems', () => {
     `bash -c 'cat /tmp/"${OTHER}"/secret'`,
     `sh -c "ls /tmp/'${other}'/"`,
     `cat /tmp/../${OTHER}/s`,
+    // `..` ended by a shell metacharacter or produced by an expansion (final review)
+    `cd /tmp/U094E5L4A15/..;cat ${OTHER}/secret`,
+    `cd /tmp/U094E5L4A15/..&&cat ${OTHER}/secret`,
+    `bash -c 'cd /tmp/U094E5L4A15/..;cat ${OTHER}/secret'`,
+    `cat /tmp/U094E5L4A15/..$'/'${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/$'..'/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/\${x:-..}/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/..{,}/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/..*/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/..$(echo /)${OTHER}/secret`,
   ])('detects cross-user access: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
   });
