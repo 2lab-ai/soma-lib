@@ -400,6 +400,18 @@ describe('case-insensitive filesystems', () => {
     `cat /tmp/U094E5L4A15/..{,}/${OTHER}/secret`,
     `cat /tmp/U094E5L4A15/..*/${OTHER}/secret`,
     `cat /tmp/U094E5L4A15/..$(echo /)${OTHER}/secret`,
+    // `..` preceded by a shell separator, brace comma or redirect (final review 2)
+    `cat /tmp/U094E5L4A15/{x,..}/${OTHER}/secret`,
+    `cat /tmp/U094E5L4A15/{,..}/${OTHER}/secret`,
+    `bash -c 'cd /tmp/U094E5L4A15;cat<../${OTHER}/secret'`,
+    `bash -c 'cd /tmp/U094E5L4A15&&cat<../${OTHER}/secret'`,
+    `bash -c 'cd /tmp/U094E5L4A15;../${OTHER}/run.sh'`,
+    `bash -c 'cd /tmp/U094E5L4A15&&../${OTHER}/run.sh'`,
+    `bash -c 'cd /tmp/U094E5L4A15;echo|../${OTHER}/run.sh'`,
+    `bash -c 'cd /tmp/U094E5L4A15;x=$(../${OTHER}/run.sh)'`,
+    `bash -c 'cd /tmp/U094E5L4A15;(../${OTHER}/run.sh)'`,
+    `bash -c 'cd /tmp/U094E5L4A15;x=\`../${OTHER}/run.sh\`'`,
+    `bash -c 'cd /tmp/U094E5L4A15;x=$(<../${OTHER}/secret)'`,
   ])('detects cross-user access: %s', (cmd) => {
     expect(isCrossUserAccess(cmd, 'U094E5L4A15')).toBe(true);
   });
@@ -426,6 +438,10 @@ describe('case-insensitive filesystems', () => {
     `bash -c 'git -C /tmp/U094E5L4A15/repo diff main..HEAD'`,
     'git -C /tmp/U094E5L4A15/repo log origin/main..HEAD',
     'cat /tmp/U094E5L4A15/notes..txt',
+    // inside a nested script: a bare `cd ..` / `cmake ..` and quoted `..` text
+    `bash -c 'cd /tmp/U094E5L4A15/proj && cd ..'`,
+    `bash -c 'cd /tmp/U094E5L4A15/build && cmake ..'`,
+    `bash -c 'cd /tmp/U094E5L4A15 && grep ".." notes'`,
     // not one of Slack's two id lengths (U/W + 8 or 10)
     'ls /tmp/u1234567',
     'ls /tmp/u123456789',

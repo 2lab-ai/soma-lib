@@ -306,13 +306,14 @@ function overridableRulesByIds(ruleIds) {
 // the same directory as `/tmp/<ID>`.
 // Applied per shell word (see `shellWords`), so a quoted path containing a
 // space stays one word and its `..` is still seen.
-// `..` as a path component, not as part of a name: preceded by `/` or by
-// expansion syntax that yields one (`$'..'`, `${x:-..}`), and not followed by a
-// filename character — so `..;`, `..&&`, `..{,}`, `..*`, `..$(…)` count, while a
-// git range such as `main..HEAD` in a nested `bash -c '…'` word, `notes..txt`, or
-// a bare `cd ..` inside a nested script do not. `[\s\S]` rather than `.`: a
-// quoted newline or CR is part of the path.
-const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp(?:\/[\s\S]*)?(?<=[/$'"{:=+?-])\.\.(?![\w.-])/i;
+// `..` as a path component, not as part of a name: not preceded by a filename
+// character, whitespace or a quote, and not followed by a filename character.
+// So `/..`, `..;`, `{x,..}`, `;../`, `<../`, `$(../`, `$'..'`, `${x:-..}` count,
+// while a git range such as `main..HEAD`, `notes..txt`, and a bare `cd ..` or a
+// quoted `".."` inside a nested `bash -c '…'` word do not. (Quotes add nothing
+// here: every word is also checked with its residual quoting stripped.)
+// `[\s\S]` rather than `.`: a quoted newline or CR is part of the path.
+const TMP_TRAVERSAL_RE = /(?:\/private)?\/+tmp(?:\/[\s\S]*)?(?<![\w.\s"'])\.\.(?![\w.-])/i;
 /** Quoting left inside a word, e.g. the inner quotes of a `bash -c '…'` script. */
 const RESIDUAL_QUOTING_RE = /["'\\]/g;
 const TMP_USER_RE = /(?:\/private)?\/+tmp\/+(?:\.\/+)*([UW][A-Z0-9]+)\b/gi;
