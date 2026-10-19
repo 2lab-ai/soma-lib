@@ -29,9 +29,10 @@ describe("session state-machine transitions", () => {
     expect(state.stopRequested).toBe(false);
     expect(isQueryRunning(state)).toBe(true);
 
-    // completeQueryTransition (→ "completing") was removed in 0.8.0: soma
-    // replaced it with finalizeQueryTransition in 435795d (a stuck
-    // "completing" state was the bug) and nothing called it since.
+    // 0.8.0 removed completeQueryTransition and the "completing" state it was
+    // the only producer of: soma replaced it with finalizeQueryTransition in
+    // 435795d (a query stuck in "completing" was the bug) and neither consumer
+    // references the state since.
     state = finalizeQueryTransition(state);
     expect(state.queryState).toBe("idle");
     expect(isQueryRunning(state)).toBe(false);
@@ -144,7 +145,6 @@ describe("predicate table + immutability contracts (review nice-to-have)", () =>
       ["preparing", true, false],
       ["running", true, true],
       ["aborting", true, true],
-      ["completing", true, true],
     ];
     for (const [qs, processing, running] of table) {
       const state = api.transitionQueryState(api.createInitialSessionRuntimeState(), qs as api.QueryState);

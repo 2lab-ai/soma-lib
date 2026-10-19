@@ -14,15 +14,15 @@
  *     processing, waiting = blocked on user input (choice/permission), idle =
  *     done. Step 4a: soma-work adopts the shared TYPE; adopting the
  *     transition functions inside its SessionRegistry is a later sub-step.
- *   - `QueryState` ('idle' | 'preparing' | 'running' | 'aborting' |
- *     'completing') — the engine-query lifecycle, with stop/interrupt flags
+ *   - `QueryState` ('idle' | 'preparing' | 'running' | 'aborting') — the
+ *     engine-query lifecycle, with stop/interrupt flags
  *     and a generation counter for stale-callback fencing.
  *
  * Provenance: soma derives from Fabrizio Rinaldi's MIT claude-telegram-bot —
  * see the attribution note in LICENSE.
  */
 export type ActivityState = "idle" | "working" | "waiting";
-export type QueryState = "idle" | "preparing" | "running" | "aborting" | "completing";
+export type QueryState = "idle" | "preparing" | "running" | "aborting";
 export interface SessionRuntimeState {
     activityState: ActivityState;
     queryState: QueryState;

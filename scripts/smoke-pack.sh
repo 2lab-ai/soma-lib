@@ -20,8 +20,9 @@ EOF
 npm install --no-fund --no-audit --silent
 
 # 1. Node CJS require — every public symbol present and functional.
-# The packed module must expose exactly the runtime exports of the built dist/
-# (all modules, not just command-safety), so a packing mistake cannot drop one.
+# The installed package must expose the same runtime exports as the committed
+# dist/index.js (catches a `files` / `exports` packing mistake), plus spot
+# checks across modules. Validates committed dist/; CI rebuilds and diffs it.
 ROOT="$ROOT" node -e '
 const l = require("soma-lib");
 const assert = require("assert");

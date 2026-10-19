@@ -110,7 +110,8 @@ export declare function createRuleSet(rules: ReadonlyArray<DangerousRule>): Rule
 export declare const EXECUTION_DISPATCH_RULES: ReadonlyArray<DangerousRule>;
 /**
  * Canonical shared catalog. Declared once, consumed by:
- *   - the flat engine exports below (`matchRules`, `overridableMatchedRuleIds`, …)
+ *   - the flat overridable helpers below (`overridableMatchedRuleIds`,
+ *     `overridableRulesByIds`) and `createRuleSet(DANGEROUS_RULES)`
  *   - soma-work `bypassBashPermissionDecision` (overridable subset)
  *   - soma-work permission-mcp-server (overridable helpers → Slack buttons)
  */
