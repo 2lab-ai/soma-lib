@@ -89,12 +89,6 @@ export function startQueryTransition(state: SessionRuntimeState): SessionRuntime
   };
 }
 
-export function completeQueryTransition(
-  state: SessionRuntimeState
-): SessionRuntimeState {
-  return transitionQueryState(state, "completing");
-}
-
 export function finalizeQueryTransition(
   state: SessionRuntimeState
 ): SessionRuntimeState {

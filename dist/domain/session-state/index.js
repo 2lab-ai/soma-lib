@@ -29,7 +29,6 @@ exports.transitionQueryState = transitionQueryState;
 exports.startProcessingTransition = startProcessingTransition;
 exports.stopProcessingTransition = stopProcessingTransition;
 exports.startQueryTransition = startQueryTransition;
-exports.completeQueryTransition = completeQueryTransition;
 exports.finalizeQueryTransition = finalizeQueryTransition;
 exports.requestStopDuringRunningTransition = requestStopDuringRunningTransition;
 exports.requestStopDuringPreparingTransition = requestStopDuringPreparingTransition;
@@ -69,9 +68,6 @@ function startQueryTransition(state) {
         queryState: "running",
         stopRequested: false,
     };
-}
-function completeQueryTransition(state) {
-    return transitionQueryState(state, "completing");
 }
 function finalizeQueryTransition(state) {
     return transitionQueryState(state, "idle");

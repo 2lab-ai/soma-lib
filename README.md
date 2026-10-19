@@ -11,8 +11,8 @@ are glue code assembling this library. The step-by-step plan lives in
 | Layer | Path | Rule |
 |---|---|---|
 | Domain | `src/domain/*` | Pure logic. No I/O, no framework imports, no env access. Fully unit-testable. |
-| Ports | `src/ports/*` | Interfaces the domain needs from the outside world (storage, clock, messenger…). *(none yet)* |
-| Adapters | `src/adapters/*` | Shared implementations of ports (fs storage, Slack/Telegram messengers…). *(none yet — they live in the apps until extracted)* |
+| Ports | `src/ports/*` | Interfaces the domain needs from the outside world (storage, clock, messenger…). See MODULES.md. |
+| Adapters | `src/adapters/*` | Shared implementations of ports (fs storage, Slack/Telegram messengers…). See MODULES.md. |
 
 Application policy (what to DO with a domain verdict — deny vs ask vs log) stays
 in the consuming apps.

@@ -45,7 +45,6 @@ export declare function transitionQueryState(state: SessionRuntimeState, nextQue
 export declare function startProcessingTransition(state: SessionRuntimeState): SessionRuntimeState;
 export declare function stopProcessingTransition(state: SessionRuntimeState): SessionRuntimeState;
 export declare function startQueryTransition(state: SessionRuntimeState): SessionRuntimeState;
-export declare function completeQueryTransition(state: SessionRuntimeState): SessionRuntimeState;
 export declare function finalizeQueryTransition(state: SessionRuntimeState): SessionRuntimeState;
 export declare function requestStopDuringRunningTransition(state: SessionRuntimeState): SessionRuntimeState;
 export declare function requestStopDuringPreparingTransition(state: SessionRuntimeState): SessionRuntimeState;

@@ -14,16 +14,15 @@
  * storage partition path) — with symmetric build/parse and invariant errors
  * carrying machine-readable codes.
  *
- * soma-work's current key is `channel-threadTs` (no tenant, different
- * separator, built ad hoc in SessionRegistry). Adopting this identity model
- * there requires migrating persisted session keys — a deliberate future step
- * recorded in the ROADMAP backlog, not smuggled in here.
+ * soma-work builds its `work:C:T` session keys with
+ * `buildSessionKeyFromInput` and reads them with `parseSessionKey` since its
+ * Step 4d key migration.
  *
  * Provenance: soma derives from Fabrizio Rinaldi's MIT claude-telegram-bot —
  * see the attribution note in LICENSE.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sessionKeyContract = exports.SessionIdentityInvariantError = exports.STORAGE_PARTITION_FORMAT = exports.SESSION_KEY_FORMAT = void 0;
+exports.SessionIdentityInvariantError = void 0;
 exports.toTenantId = toTenantId;
 exports.toChannelId = toChannelId;
 exports.toThreadId = toThreadId;
@@ -32,13 +31,10 @@ exports.buildSessionKey = buildSessionKey;
 exports.buildSessionKeyFromInput = buildSessionKeyFromInput;
 exports.parseSessionKey = parseSessionKey;
 exports.buildStoragePartitionKey = buildStoragePartitionKey;
-exports.buildStoragePartitionKeyFromInput = buildStoragePartitionKeyFromInput;
 exports.parseStoragePartitionKey = parseStoragePartitionKey;
 const SESSION_KEY_SEPARATOR = ":";
 const STORAGE_PARTITION_SEPARATOR = "/";
 const DISALLOWED_IDENTITY_CHARS = /[:/\\]/;
-exports.SESSION_KEY_FORMAT = "tenant:channel:thread";
-exports.STORAGE_PARTITION_FORMAT = "tenant/channel/thread";
 class SessionIdentityInvariantError extends Error {
     constructor(code, field, value) {
         super(`Invalid ${field} (${code}): "${value}"`);
@@ -96,17 +92,7 @@ function parseSessionKey(sessionKey) {
 function buildStoragePartitionKey(identity) {
     return `${identity.tenantId}${STORAGE_PARTITION_SEPARATOR}${identity.channelId}${STORAGE_PARTITION_SEPARATOR}${identity.threadId}`;
 }
-function buildStoragePartitionKeyFromInput(input) {
-    return buildStoragePartitionKey(createSessionIdentity(input));
-}
 function parseStoragePartitionKey(storagePartitionKey) {
     const [tenantId, channelId, threadId] = splitIdentityTriplet(storagePartitionKey, STORAGE_PARTITION_SEPARATOR, "STORAGE_PARTITION_INVALID_FORMAT", "storagePartitionKey");
     return createSessionIdentity({ tenantId, channelId, threadId });
 }
-exports.sessionKeyContract = {
-    createIdentity: createSessionIdentity,
-    buildSessionKey,
-    parseSessionKey,
-    buildStoragePartitionKey,
-    parseStoragePartitionKey,
-};

@@ -7,11 +7,14 @@ import {
   createRuleSet,
   isCrossUserAccess,
   isSshCommand,
-  matchRules,
   overridableMatchedRuleIds,
   overridableRulesByIds,
-  rulesByIds,
 } from './index';
+
+// Full-catalog engine over the canonical rules (lockdown + overridable). The
+// flat `matchRules` / `rulesByIds` exports were removed in 0.8.0 (no consumer
+// ever called them); the RuleSet methods are the supported way to get this.
+const { matchRules, rulesByIds } = createRuleSet(DANGEROUS_RULES);
 
 describe('rule catalog', () => {
   it('every rule has a stable id, label, description, and sessionOverridable flag', () => {

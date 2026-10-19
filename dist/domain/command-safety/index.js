@@ -26,9 +26,10 @@
  *     out-of-process permission children — lockdown ids are silently filtered
  *     out so the child never sees them, even if a stale id sneaks into a
  *     button payload or a session disable set.
- *   - `matchRules` / `rulesByIds` operate over the full catalog. They are for
- *     parent-side callers that need the lockdown rules (audit logging,
- *     enforcement wiring). They are NOT what a permission child should call.
+ *   - Full-catalog matching (lockdown + overridable) is the `RuleSet` method
+ *     `createRuleSet(DANGEROUS_RULES).matchRules`. The flat `matchRules` /
+ *     `rulesByIds` exports were removed in 0.8.0: neither consumer ever called
+ *     them (soma-work's last `rulesByIds` caller went in #768).
  *   - `isCrossUserAccess` / `isSshCommand` are standalone matchers meant to be
  *     wired onto dedicated PreToolUse hooks, so an app's bypass state can
  *     never silence them.
@@ -42,8 +43,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DANGEROUS_RULES = exports.EXECUTION_DISPATCH_RULES = void 0;
 exports.createRuleSet = createRuleSet;
-exports.matchRules = matchRules;
-exports.rulesByIds = rulesByIds;
 exports.overridableMatchedRuleIds = overridableMatchedRuleIds;
 exports.overridableRulesByIds = overridableRulesByIds;
 exports.isCrossUserAccess = isCrossUserAccess;
@@ -267,24 +266,6 @@ exports.DANGEROUS_RULES = [
     },
 ];
 const CANONICAL = createRuleSet(exports.DANGEROUS_RULES);
-/**
- * Return every rule in the canonical catalog that matches `command`.
- * Both overridable and lockdown rules are returned — callers decide what to do.
- *
- * Parent-process callers that want lockdown enforcement should use this. A
- * permission child should NEVER call this — call `overridableMatchedRuleIds`.
- */
-function matchRules(command, ctx = {}) {
-    return CANONICAL.matchRules(command, ctx);
-}
-/**
- * Look up rules by id over the FULL canonical catalog (lockdown + overridable).
- * Order preserved; unknown ids silently dropped. Parent-only — a permission
- * child must use `overridableRulesByIds` instead.
- */
-function rulesByIds(ruleIds) {
-    return CANONICAL.rulesByIds(ruleIds);
-}
 /**
  * Returns the overridable canonical rule ids that match `command`
  * (cross-user/ssh excluded). Used by out-of-process permission servers to

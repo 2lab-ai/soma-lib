@@ -1,6 +1,6 @@
 {
   "name": "soma-lib",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Shared hexagonal core for soma (Telegram/Slack personal bot) and soma-work (Slack work harness): domain logic, ports, and adapters extracted step by step.",
   "license": "MIT",
   "repository": {
@@ -18,7 +18,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "!src/**/*.test.ts"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
